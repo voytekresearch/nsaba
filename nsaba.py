@@ -51,17 +51,7 @@ def create_aba_npys(folder_path='', output_path='',
     probes_mat = None
     print '%s created.' % npy_names[2]
     return 0
-    
-    
-def create_ns_pkl(folder_path='.', output_path='.'):
-    db_path = os.path.join(folder_path, 'database.txt')
-    dataset = Dataset(db_path)
-    dataset.add_features('features.txt')
-    pkl_path = os.path.join(output_path, 'ns_dataset.pkl')
-    print 'Output Directory: %s' % output_path
-    dataset.save(pkl_path)
-    print 'ns_dataset.pkl created.'
-    return 0
+
 
 class Nsaba(object):
     aba = { 
@@ -71,12 +61,21 @@ class Nsaba(object):
         'probe_df': None,
         'si_mat': None,
         'si_df': None,
+        'mni_coords': None
     }
 
-    mni_coords = None
-    
-    ns_db = None
-    
+    ns = {
+        'mni_term_table': None,
+        'terms': None,
+        'study_ids': None,
+        'unique_ids': None,
+        'ids_x_features': None,
+        'database_labels': None,
+        'x_mni': None,
+        'y_mni': None,
+        'z_mni': None,
+    }
+
     @classmethod
     def aba_load(cls, path='.',
             npy_names=['ABA_MicroExpression.npy',
@@ -103,16 +102,31 @@ class Nsaba(object):
         cls.aba['probe_df'] = pd.DataFrame(cls.aba['probe_mat'])
         print '%s loaded.' % npy_names[2]
         
-        cls.mni_coords = cls.aba['si_mat'][1:,10:].astype(float)
-        print 'Nsaba.mni_coords intialized.'
+        cls.aba['mni_coords'] = cls.aba['si_mat'][1:,10:].astype(float)
+        print "Nsaba.aba['mni_coords'] initialized."
         return 0
         
     @classmethod
-    def ns_load(cls, file_path):
-        cls.ns_db = Dataset.load(file_path)
-        print '%s loaded' % os.path.basename(file_path)
+    def ns_load(cls, ns_path, ns_files=['database.txt', 'features.txt']):
+        """ Initialization 'ns' dictionary """
+        df = pd.read_table(os.path.join(ns_path, ns_files[0]))
+        mni_space = df[df['space'].str.contains("MNI")]
+
+        cls.ns['x_mni'] =  list(mni_space['x'])
+        cls.ns['y_mni'] =  list(mni_space['y'])
+        cls.ns['z_mni'] =  list(mni_space['z'])
+        cls.ns['study_ids'] =  list(mni_space['id'])
+        cls.ns['unique_ids'] =  list(set(cls.ns['study_ids'])) #removing duplicates
+        print '%s keys loaded.' % ns_files[0]
+
+        term_table = pd.read_table('features.txt')
+        cls.ns['mni_term_table'] = term_table.loc[term_table['pmid'].isin(cls.ns['unique_ids'])]
+        cls.ns['terms'] = term_table.columns.values
+        cls.ns['id_x_features'] = np.array(cls.ns['mni_term_table'])
+        cls.ns['database_labels'] = df.columns.values
+        print '%s keys loaded.' % ns_files[1]
         return 0
-         
+
     def __init__(self):
         
         self.ge = {}
@@ -133,7 +147,6 @@ class Nsaba(object):
             if isinstance(entrez_ids, str):
                 print "Invalid parameter form; please contain entrez ids as 'str' types in iterable container"
                 return 1
-                
 
         for entrez_id in entrez_ids:
             probe_ids = pd.DataFrame(self.aba['probe_df'].loc[self.aba['probe_df'][5] == \
@@ -186,8 +199,12 @@ class Nsaba(object):
         
 from nsaba import Nsaba
 
-path 'blab' #path is folder location
-Nsaba.load(path)    
+ns_path = 'blah/blah'
+aba_path = 'blah/bluh'
+
+Nsaba.aba_load(aba_path)
+Nsaba.ns_load(ns_path)
+
 A = Nsaba()
 
 A.get_ge('7889')
