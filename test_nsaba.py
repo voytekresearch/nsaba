@@ -56,5 +56,6 @@ class NsabaTestCase(unittest.TestCase):
         self.assertEquals(len(nsaba_pass.ge['733'][0]), 893)
         self.assertEquals(nsaba_pass.ge['1'][3], 2)
 
+
 if __name__ == '__main__':
     unittest.main()

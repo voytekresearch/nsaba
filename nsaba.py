@@ -66,8 +66,11 @@ class Nsaba(object):
         return 0
 
     @classmethod
-    def ns_load(cls, ns_path, ns_files=['database.txt', 'features.txt']):
+    def ns_load(cls, ns_path, ns_files=None):
         """ Initialization 'ns' dictionary """
+        if not ns_files:
+            ns_files = ['database.txt', 'features.txt']
+
         df = pd.read_table(os.path.join(ns_path, ns_files[0]))
         mni_space = df[df['space'].str.contains("MNI")]
 
