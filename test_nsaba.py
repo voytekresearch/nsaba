@@ -16,10 +16,6 @@ class NsabaLoaderTest(unittest.TestCase):
         aba_dir = 'data_dir'
         self.assertEquals(Nsaba.aba_load(aba_dir), 0)
 
-    def test_ns_load(self):
-        ns_db = 'data_dir/dataset.pkl'
-        self.assertEquals(Nsaba.ns_load(ns_db), 0)
-
     def test_static_si_intialize(self):
         self.assertIsNotNone(Nsaba.aba['si_mat'])
         self.assertIsNotNone(Nsaba.aba['si_df'])
@@ -61,17 +57,4 @@ class NsabaTestCase(unittest.TestCase):
         self.assertEquals(nsaba_pass.ge['1'][3], 2)
 
 if __name__ == '__main__':
-
-    while True:
-        print " -- test_nsaba.py relies on IO; please ensure ABA & NS binaries are in a relative path directory called 'data_dir'"
-        ans = raw_input(' -- Is this the case? (Y/n): ')
-        if ans == 'Y':
-            break
-        elif ans == 'n':
-            print " -- Please move or create 'data_dir' with appropriate test binaries in working directory."
-            quit()
-        else:
-            continue
-
-
     unittest.main()
