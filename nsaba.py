@@ -3,61 +3,17 @@
 Neurosynth & Allen Brain Atlas: nsaba
 Authors: Simon Haxby, Scott Susi, Torben Noto
 
-Last Updated: 7/9/2015
+Last Updated: 7/26/2015
 """
-import nibabel
 import numpy as np
 import pandas as pd
-import csv
 import os
-from neurosynth.base.dataset import Dataset
-from neurosynth.analysis import meta, decode, network
-
-
-def create_aba_npys(folder_path='', output_path='',
-        npy_names=['ABA_MicroExpression.npy',
-                   'ABA_SampleAnnot.npy',
-                   'ABA_Probes.npy']):
-                       
-    exp_file = 'MicroarrayExpression.csv'
-    si_file = 'SampleAnnot.csv'    
-    probe_file = 'Probes.csv'
-    
-    print 'Output Directory: %s' % os.getcwd()
-
-    with open(os.path.join(folder_path, exp_file), 'rb') as f:
-        reader = csv.reader(f)
-        expression_mat = np.array(list(reader))
-     
-    np.save(os.path.join(output_path, npy_names[0]), expression_mat)
-    expression_mat = None
-    print '%s created.' % npy_names[0]
-
-    
-    with open(os.path.join(folder_path, si_file), 'rb') as f:
-        reader = csv.reader(f)
-        sample_info = np.array(list(reader))
-        
-    np.save(os.path.join(output_path, npy_names[1]), sample_info)
-    sample_info = None
-    print '%s created.' % npy_names[1]
-
-    
-    with open(os.path.join(folder_path, probe_file), 'rb') as f:
-        reader = csv.reader(f)
-        probes_mat = np.array(list(reader))
-        
-    np.save(os.path.join(output_path, npy_names[2]), probes_mat)
-    probes_mat = None
-    print '%s created.' % npy_names[2]
-    return 0
-
 
 class Nsaba(object):
-    aba = { 
+    aba = {
         'exp_mat': None,
         'exp_df': None,
-        'probe_mat': None,   
+        'probe_mat': None,
         'probe_df': None,
         'si_mat': None,
         'si_df': None,
@@ -77,46 +33,49 @@ class Nsaba(object):
     }
 
     @classmethod
-    def aba_load(cls, path='.',
-            npy_names=['ABA_MicroExpression.npy',
-                       'ABA_SampleAnnot.npy',
-                       'ABA_Probes.npy']):
-                           
-        if len(npy_names) != 3:
-            raise IndexError, "'npy_names' must a list of 3 'str' variables"
-            
-        print 'This may take a minute or two ...'
-  
-        npy_path = os.path.join(path, npy_names[0])
-        cls.aba['exp_mat'] = np.load(npy_path)
-        cls.aba['exp_df']  = pd.DataFrame(cls.aba['exp_mat'])
-        print '%s loaded.' % npy_names[0]
-        
-        npy_path = os.path.join(path, npy_names[1])
-        cls.aba['si_mat'] = np.load(npy_path)
-        cls.aba['si_df']  = pd.DataFrame(cls.aba['si_mat'])
-        print '%s loaded.' % npy_names[1]
+    def aba_load(cls, path='.', csv_names=None):
 
-        npy_path = os.path.join(path, npy_names[2])
-        cls.aba['probe_mat'] = np.load(npy_path)
-        cls.aba['probe_df'] = pd.DataFrame(cls.aba['probe_mat'])
-        print '%s loaded.' % npy_names[2]
-        
-        cls.aba['mni_coords'] = cls.aba['si_mat'][1:,10:].astype(float)
+        if not csv_names:
+            csv_names = [
+                'MicroarrayExpression.csv',
+                'SampleAnnot.csv',
+                'Probes.csv']
+
+        if len(csv_names) != 3:
+            raise IndexError, "'csv_names' must a list of 3 'str' variables"
+
+        print 'This may take a minute or two ...'
+
+        csv_path = os.path.join(path, csv_names[0])
+        cls.aba['exp_df'] = pd.read_csv(csv_path)
+        cls.aba['exp_mat'] = cls.aba['exp_df'].as_matrix()
+        print '%s loaded.' % csv_names[0]
+
+        csv_path = os.path.join(path, csv_names[1])
+        cls.aba['si_df'] = pd.read_csv(csv_path)
+        cls.aba['si_mat'] = cls.aba['si_df'].as_matrix()
+        print '%s loaded.' % csv_names[1]
+
+        csv_path = os.path.join(path, csv_names[2])
+        cls.aba['probe_df'] = pd.read_csv(csv_path)
+        cls.aba['probe_mat'] = cls.aba['probe_df'].as_matrix()
+        print '%s loaded.' % csv_names[2]
+
+        cls.aba['mni_coords'] = cls.aba['si_mat'][1:, 10:].astype(float)
         print "Nsaba.aba['mni_coords'] initialized."
         return 0
-        
+
     @classmethod
     def ns_load(cls, ns_path, ns_files=['database.txt', 'features.txt']):
         """ Initialization 'ns' dictionary """
         df = pd.read_table(os.path.join(ns_path, ns_files[0]))
         mni_space = df[df['space'].str.contains("MNI")]
 
-        cls.ns['x_mni'] =  list(mni_space['x'])
-        cls.ns['y_mni'] =  list(mni_space['y'])
-        cls.ns['z_mni'] =  list(mni_space['z'])
-        cls.ns['study_ids'] =  list(mni_space['id'])
-        cls.ns['unique_ids'] =  list(set(cls.ns['study_ids'])) #removing duplicates
+        cls.ns['x_mni'] = list(mni_space['x'])
+        cls.ns['y_mni'] = list(mni_space['y'])
+        cls.ns['z_mni'] = list(mni_space['z'])
+        cls.ns['study_ids'] = list(mni_space['id'])
+        cls.ns['unique_ids'] = list(set(cls.ns['study_ids']))  # removing duplicates
         print '%s keys loaded.' % ns_files[0]
 
         term_table = pd.read_table('features.txt')
@@ -128,16 +87,16 @@ class Nsaba(object):
         return 0
 
     def __init__(self):
-        
+
         self.ge = {}
-       # ...
-       # ...
-  
+        # ...
+        # ...
+
     def get_ge(self, entrez_ids):
-        
+
         if self.__check_static_members() == 1:
             return 1
-            
+
         try:
             iter(entrez_ids)
         except TypeError:
@@ -150,36 +109,35 @@ class Nsaba(object):
 
         for entrez_id in entrez_ids:
             probe_ids = pd.DataFrame(self.aba['probe_df'].loc[self.aba['probe_df'][5] == \
-                entrez_id]).index.tolist()
-                
+                                                              entrez_id]).index.tolist()
+
             if len(probe_ids) == 0:
                 print 'Entrez ID: %s not registered with ABA database' % entrez_id
                 continue
-            
-            ge_df = pd.DataFrame(self.aba['exp_df'].loc[probe_ids.pop(0)-1, :])
+
+            ge_df = pd.DataFrame(self.aba['exp_df'].loc[probe_ids.pop(0) - 1, :])
             for probe_id in probe_ids:
-                ge_df = ge_df.join(self.aba['exp_df'].loc[probe_id-1, :])
-            
-            ge_mat = ge_df.as_matrix().astype(float)[1:,:]
+                ge_df = ge_df.join(self.aba['exp_df'].loc[probe_id - 1, :])
+
+            ge_mat = ge_df.as_matrix().astype(float)[1:, :]
             self.ge[entrez_id] = []
-             
+
             self.ge[entrez_id].append([np.mean(row) for row in ge_mat])
-            diff_arr = [np.amax(row) - np.amin(row) for row in ge_mat] 
+            diff_arr = [np.amax(row) - np.amin(row) for row in ge_mat]
             self.ge[entrez_id].append(diff_arr)
             self.ge[entrez_id].append(np.amax(diff_arr))
             self.ge[entrez_id].append(len(ge_mat[0]))
 
         return 0
 
-              
     def make_ge_ns_mat(self):
         if self.__check_static_members() == 1:
-            return 1 
-            
-    def get_ns_act(self, query, term_freq=.005):
-         if self.__check_static_members() == 1:
             return 1
-            
+
+    def get_ns_act(self, query, term_freq=.005):
+        if self.__check_static_members() == 1:
+            return 1
+
     def __check_static_members(self):
         for val in self.aba.itervalues():
             if val is None:
@@ -190,7 +148,7 @@ class Nsaba(object):
             return 1
         return 0
 
-        
+
 # -----------------------------------------------------------
 
 # Example Usage

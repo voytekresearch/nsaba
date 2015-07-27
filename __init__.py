@@ -1,1 +1,1 @@
-import nsaba
+from nsaba import *
