@@ -81,7 +81,7 @@ class Nsaba(object):
         cls.ns['unique_ids'] = list(set(cls.ns['study_ids']))  # removing duplicates
         print '%s keys loaded.' % ns_files[0]
 
-        term_table = pd.read_table('features.txt')
+        term_table = pd.read_table(os.path.join(ns_path, ns_files[1])
         cls.ns['mni_term_table'] = term_table.loc[term_table['pmid'].isin(cls.ns['unique_ids'])]
         cls.ns['terms'] = term_table.columns.values
         cls.ns['id_x_features'] = np.array(cls.ns['mni_term_table'])
