@@ -34,7 +34,7 @@ class Nsaba(object):
 
     @classmethod
     def aba_load(cls, path='.', csv_names=None):
-
+        """ Initialization 'aba' dictionary """
         if not csv_names:
             csv_names = [
                 'MicroarrayExpression.csv',
@@ -150,32 +150,3 @@ class Nsaba(object):
             print "Unassigned Nsaba 'ns_db' static variable: see Nsaba.ns_load(path)"
             return 1
         return 0
-
-
-# -----------------------------------------------------------
-
-# Example Usage
-
-'''
-        
-from nsaba import Nsaba
-
-ns_path = 'blah/blah'
-aba_path = 'blah/bluh'
-
-Nsaba.aba_load(aba_path)
-Nsaba.ns_load(ns_path)
-
-A = Nsaba()
-
-A.get_ge('7889')
-A.get_ns_act('Alzhiemers')
-mat = A.make_ge_ns_mat()
-
-B = Nsaba()
-
-'''
-
-# Run science here
-
-# -----------------------------------------------------------
