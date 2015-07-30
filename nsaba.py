@@ -34,7 +34,7 @@ class Nsaba(object):
     }
 
     @classmethod
-    def aba_load(cls, path='.', csv_names=None):
+    def aba_load(cls, aba_path, csv_names=None):
         """Initialization of 'aba' dictionary"""
         if not csv_names:
             csv_names = [
@@ -47,17 +47,17 @@ class Nsaba(object):
 
         print 'This may take a minute or two ...'
 
-        csv_path = os.path.join(path, csv_names[0])
+        csv_path = os.path.join(aba_path, csv_names[0])
         cls.aba['exp_df'] = pd.read_csv(csv_path)
         cls.aba['exp_mat'] = cls.aba['exp_df'].as_matrix()
         print '%s loaded.' % csv_names[0]
 
-        csv_path = os.path.join(path, csv_names[1])
+        csv_path = os.path.join(aba_path, csv_names[1])
         cls.aba['si_df'] = pd.read_csv(csv_path)
         cls.aba['si_mat'] = cls.aba['si_df'].as_matrix()
         print '%s loaded.' % csv_names[1]
 
-        csv_path = os.path.join(path, csv_names[2])
+        csv_path = os.path.join(aba_path, csv_names[2])
         cls.aba['probe_df'] = pd.read_csv(csv_path)
         cls.aba['probe_mat'] = cls.aba['probe_df'].as_matrix()
         print '%s loaded.' % csv_names[2]
@@ -109,8 +109,10 @@ class Nsaba(object):
 
     def get_ge(self, entrez_ids):
 
+        '''
         if self.__check_static_members() == 1:
-            return 1
+            print ' '
+            #return 1
 
         try:
             iter(entrez_ids)
@@ -121,9 +123,10 @@ class Nsaba(object):
             if isinstance(entrez_ids, str):
                 print "Invalid parameter form; please contain entrez ids as 'str' types in iterable container"
                 return 1
+        '''
 
         for entrez_id in entrez_ids:
-            probe_ids = pd.DataFrame(self.aba['probe_df'].loc[self.aba['probe_df'][5] == entrez_id]).index.tolist()
+            probe_ids = self.aba['probe_df'].loc[self.aba['probe_df']['entrez_id'] == entrez_id].index.tolist()
 
             if len(probe_ids) == 0:
                 print 'Entrez ID: %s not registered with ABA database' % entrez_id
@@ -144,7 +147,10 @@ class Nsaba(object):
 
         return 0
 
-    # bookeeping methods
+    def get_aba_xyz(self):
+        return 1
+
+    # NSbook keeping methods
     def is_term(self, term):
         """Checks if this term is in the neurosynth database"""
         if term in self.ns['mni_term_table']:
@@ -219,7 +225,7 @@ class Nsaba(object):
         else:
             return 'not valid location'
 
-    def term_to_IDs(self, term, thresh):
+    def term_to_ids(self, term, thresh):
         '''Matches a term to the IDs of studies that use that term above a given threshold'''
         if self.is_term(term):
             term_all_ids = np.array(self.ns['mni_term_table'][term])
@@ -241,19 +247,19 @@ class Nsaba(object):
         return dist
 
     def find_neighbors(self, coord, dist):
-        neighbors = [];
-        for x in xrange(int(coord[0]-(dist+1)),int(coord[0]+(dist+1))):
-            for y in xrange(int(coord[1]-(dist+1)),int(coord[1]+(dist+1))):
+        neighbors = []
+        for x in xrange(int(coord[0]-(dist+1)), int(coord[0]+(dist+1))):
+            for y in xrange(int(coord[1]-(dist+1)), int(coord[1]+(dist+1))):
                 for z in xrange(int(coord[2]-(dist+1)),int(coord[2]+(dist+1))):
-                    if calc_distance(coord,(x,y,z)) == dist:
-                        neighbors.append((float(x),float(y),float(z)))    
+                    if calc_distance(coord, (x, y, z)) == dist:
+                        neighbors.append((float(x), float(y), float(z)))
         return neighbors
   
     def sphere(self, coord,maxDist):
         '''Finds every point in a sphere around a given point of radius maxDist'''
         ind_sphere = [];
         for d in xrange(maxDist):
-            ind_sphere.append(find_neighbors(coord,d));
+            ind_sphere.append(find_neighbors(coord, d))
         return ind_sphere
     
     
@@ -261,32 +267,29 @@ class Nsaba(object):
     def assign_weights(self, ind_sphere,weight = 2):
         '''Assigns weights to a point sphere produced by the sphere method'''
         '''weight must be >1'''
-        weight_vector = np.ones((1,len(ind_sphere)));  
-        for layer in xrange(1,len(ind_sphere)):
-            weight_vector[0,layer] = 1/(float(layer)*weight)
+        weight_vector = np.ones((1, len(ind_sphere)))
+        for layer in xrange(1, len(ind_sphere)):
+            weight_vector[0, layer] = 1/(float(layer)*weight)
     
         return weight_vector
 
-
-    #estimating term weights of unknown location
-
+    # estimating term weights of unknown location
     def term_vector_of_unknown_point(self, coord, maxDist):   
         '''Estimates the terms of an unknown point by drawing from known points around it using a sphere of radius maxDist'''
         if self.is_location(coord) == True:
             return self.coord_to_terms(coord)
         else:
-            ind_sphere = self.sphere(coord,maxDist);
-            weight_vect = self.assign_weights(ind_sphere);
-            self.ns['termVect'] = [];
+            ind_sphere = self.sphere(coord, maxDist)
+            weight_vect = self.assign_weights(ind_sphere)
+            self.ns['termVect'] = []
             for layer in xrange(len(ind_sphere)):
                 for c in ind_sphere[layer]:
-                    #print c
                     if self.is_location(c) == True:
                         print 'found a nearby point'
                         print c
                         if ~np.isnan(np.sum(self.coord_to_terms(c))):
                             temp = self.coord_to_terms(c);
-                            self.ns['termVect'].append([t*weight_vect[0,layer] for t in temp])
+                            self.ns['termVect'].append([t*weight_vect[0, layer] for t in temp])
                             print weight_vect[0,layer]
         
             if len(self.ns['termVect'])>1:
@@ -294,7 +297,14 @@ class Nsaba(object):
                 self.ns['termVect'] = np.sum(self.ns['termVect'],0);
             
             return self.ns['termVect']
-        
+
+    def generate_ns_vector(self,ge_vector):
+        return 1
+
+
+    def correlate_ge_ns(self,ge_vector,ns_vector):
+        return 1
+
 
     def make_ge_ns_mat(self):
         if self.__check_static_members() == 1:
