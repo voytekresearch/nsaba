@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import os
 
+
 class Nsaba(object):
     aba = {
         'exp_mat': None,
@@ -34,7 +35,7 @@ class Nsaba(object):
 
     @classmethod
     def aba_load(cls, path='.', csv_names=None):
-        """ Initialization 'aba' dictionary """
+        """Initialization of 'aba' dictionary"""
         if not csv_names:
             csv_names = [
                 'MicroarrayExpression.csv',
@@ -67,7 +68,7 @@ class Nsaba(object):
 
     @classmethod
     def ns_load(cls, ns_path, ns_files=None):
-        """ Initialization 'ns' dictionary """
+        """Initialization of 'ns' dictionary"""
         if not ns_files:
             ns_files = ['database.txt', 'features.txt']
 
@@ -92,7 +93,7 @@ class Nsaba(object):
         c = 0
         for i in cls.ns['study_ids']:
             if i not in cls.ns['id_dict']:
-                cls.ns['id_dict'][i] = [(cls.ns['x_mni'][c], cls.ns['y_mni'][c], cls.ns['z_mni'][c])];
+                cls.ns['id_dict'][i] = [(cls.ns['x_mni'][c], cls.ns['y_mni'][c], cls.ns['z_mni'][c])]
                 c += 1
             elif (cls.ns['x_mni'][c], cls.ns['y_mni'][c], cls.ns['z_mni'][c]) in cls.ns['id_dict'][i]:
                 c += 1
@@ -122,8 +123,7 @@ class Nsaba(object):
                 return 1
 
         for entrez_id in entrez_ids:
-            probe_ids = pd.DataFrame(self.aba['probe_df'].loc[self.aba['probe_df'][5] == \
-                                                              entrez_id]).index.tolist()
+            probe_ids = pd.DataFrame(self.aba['probe_df'].loc[self.aba['probe_df'][5] == entrez_id]).index.tolist()
 
             if len(probe_ids) == 0:
                 print 'Entrez ID: %s not registered with ABA database' % entrez_id
@@ -144,23 +144,23 @@ class Nsaba(object):
 
         return 0
 
-    #bookeeping methods
-    def isTerm(self, term):
-        '''Checks if this term is in the neurosynth database'''
+    # bookeeping methods
+    def is_term(self, term):
+        """Checks if this term is in the neurosynth database"""
         if term in self.ns['mni_term_table']:
             return True
         else:
             return False
 
-    def isLocation(self, coords):
-        '''Checks if coordinate set (x,y,z) is mentioned in any studies'''
+    def is_location(self, coords):
+        """Checks if coordinate set (x,y,z) is mentioned in any studies"""
         if np.floor(coords[0]) in np.floor(self.ns['x_mni']):
-            #ind = x_vals.index(coords[0]);
+            # ind = x_vals.index(coords[0]);
 
             for xind in xrange(len(self.ns['x_mni'])):
                 if coords[0] == self.ns['x_mni'][xind]:
                     if np.floor(self.ns['y_mni'][xind]) == np.floor(coords[1]):
-                        #print '2'
+                        # print '2'
                         if np.floor(self.ns['z_mni'][xind]) == np.floor(coords[2]):
                             return True
             else:
@@ -168,16 +168,16 @@ class Nsaba(object):
         else:
             return False
 
-    def isID(self, ID):
-        '''Checks if ID is an ID with NMI coordinates'''
+    def is_id(self, ID):
+        """Checks if ID is an ID with NMI coordinates"""
         if ID in self.ns['id_dict']:
             return True
         else:
             return False
 
-    def CoordtoIDs(self, coord):
-        '''Uses the study dictionary above to find study ids from x,y,z coordinates'''
-        if self.isLocation(coord):
+    def coord_to_ids(self, coord):
+        """Uses the study dictionary above to find study ids from x,y,z coordinates"""
+        if self.is_location(coord):
             self.ns['temp_IDs'] = []
             for i, coords in self.ns['id_dict'].items():
                 if coord in coords:
@@ -186,23 +186,24 @@ class Nsaba(object):
         else:
             return "These coordinates don't match any studies"
 
-    def IDtoTerms(self, ID):
-        '''Finds all of the term heat values of a given ID'''
-        if self.isID(ID):
+    def id_to_terms(self, ID):
+        """Finds all of the term heat values of a given ID"""
+        if self.is_id(ID):
             ind = int(np.squeeze(np.where(self.ns['id_x_features'] == ID))[0])
             self.ns['temp_term'] = list(self.ns['mni_term_table'].iloc[ind][1:])
             return self.ns['temp_term']
         else:
-            return 'Not an ID of a study in NMI space';
+            return 'Not an ID of a study in NMI space'
 
-    def IDtoCoords(self, ID):
-        '''Finds coordinates associated with a given study ID'''
-        if self.isID(ID):
+    def id_to_coords(self, ID):
+        """Finds coordinates associated with a given study ID"""
+        if self.is_id(ID):
             self.ns['temp_coords'] = self.ns['id_dict'][ID]
             return self.ns['temp_coords']
         else:
             return 'Not an ID of a study in NMI space'
 
+<<<<<<< HEAD
     def CoordtoTerms(self, coord):
         '''Returns the vector of term heats for a given (x,y,z) coordinate set.
         If there are multiple studies that mention the same coordinates, the average is taken.'''
@@ -246,7 +247,8 @@ class Nsaba(object):
             if val is None:
                 print "Unassigned Nsaba 'aba' static variable: see Nsaba.aba_load(path)"
                 return 1
-        if self.ns_db is None:
-            print "Unassigned Nsaba 'ns_db' static variable: see Nsaba.ns_load(path)"
-            return 1
+        for val in self.ns.itervalues():
+            if val is None:
+                print "Unassigned Nsaba 'ns' static variable: see Nsaba.ns_load(path)"
+                return 1
         return 0
