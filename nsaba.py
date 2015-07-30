@@ -144,11 +144,15 @@ class Nsaba(object):
             self.ge[entrez_id].append(diff_arr)
             self.ge[entrez_id].append(np.amax(diff_arr))
             self.ge[entrez_id].append(len(ge_mat[0]))
-
+        self.ge[entrez_id] = np.squeeze(self.ge[entrez_id])
         return 0
 
     def get_aba_xyz(self):
-        return 1
+        xvals = self.aba['si_df']['mni_x']
+        yvals = self.aba['si_df']['mni_y']
+        zvals = self.aba['si_df']['mni_z']
+        self.aba['xyz'] = zip(xvals, yvals, zvals)
+        return self.aba['xyz']
 
     # NSbook keeping methods
     def is_term(self, term):
@@ -215,7 +219,7 @@ class Nsaba(object):
         if self.is_location(coord):
             ids = self.coord_to_ids(coord)
             if len(ids) == 1:
-                return self.IDtoTerms(ids[0])
+                return self.id_to_terms(ids[0])
             else:
                 temp = np.zeros((len(ids), 3406))
                 for i in xrange(len(ids)):
@@ -251,15 +255,15 @@ class Nsaba(object):
         for x in xrange(int(coord[0]-(dist+1)), int(coord[0]+(dist+1))):
             for y in xrange(int(coord[1]-(dist+1)), int(coord[1]+(dist+1))):
                 for z in xrange(int(coord[2]-(dist+1)),int(coord[2]+(dist+1))):
-                    if calc_distance(coord, (x, y, z)) == dist:
+                    if self.calc_distance(coord, (x, y, z)) == dist:
                         neighbors.append((float(x), float(y), float(z)))
         return neighbors
   
-    def sphere(self, coord,maxDist):
+    def sphere(self, coord, maxDist):
         '''Finds every point in a sphere around a given point of radius maxDist'''
         ind_sphere = [];
         for d in xrange(maxDist):
-            ind_sphere.append(find_neighbors(coord, d))
+            ind_sphere.append(self.find_neighbors(coord, d))
         return ind_sphere
     
     
@@ -276,8 +280,11 @@ class Nsaba(object):
     # estimating term weights of unknown location
     def term_vector_of_unknown_point(self, coord, maxDist):   
         '''Estimates the terms of an unknown point by drawing from known points around it using a sphere of radius maxDist'''
+        self.ns['termVect'] = []
         if self.is_location(coord) == True:
-            return self.coord_to_terms(coord)
+            self.ns['termVect'] = self.coord_to_terms(coord)
+            print 'This point exists!'
+            return self.ns['termVect']
         else:
             ind_sphere = self.sphere(coord, maxDist)
             weight_vect = self.assign_weights(ind_sphere)
@@ -288,22 +295,47 @@ class Nsaba(object):
                         print 'found a nearby point'
                         print c
                         if ~np.isnan(np.sum(self.coord_to_terms(c))):
-                            temp = self.coord_to_terms(c);
+                            temp = self.coord_to_terms(c)
                             self.ns['termVect'].append([t*weight_vect[0, layer] for t in temp])
-                            print weight_vect[0,layer]
-        
-            if len(self.ns['termVect'])>1:
+                            print weight_vect[0, layer]
+
+            if len(self.ns['termVect']) > 1:
                 #Need a better way to normalize
-                self.ns['termVect'] = np.sum(self.ns['termVect'],0);
-            
+                self.ns['termVect'] = np.sum(self.ns['termVect'], 0)
+
             return self.ns['termVect']
 
-    def generate_ns_vector(self,ge_vector):
-        return 1
+    #NS/ABA methods
+    def generate_ns_vector(self, term):
+        ##
+        if not self.aba['xyz']:
+            self.get_aba_xyz()
 
+        self.ns['activation_vector'] = np.zeros((len(self.aba['xyz'])))
+        c = 0
+        for xyz_set in self.aba['xyz']:
+            xyz_set = np.floor(xyz_set).tolist()
+            #print xyz_set
+            temp_term_vector = self.term_vector_of_unknown_point(xyz_set, 5)
+            if not isinstance(temp_term_vector, list):
+                temp_term_vector = list(temp_term_vector)
+            #print type(temp_term_vector)
+            #print temp_term_vector
+            if len(temp_term_vector) == 1:
+                self.ns['activation_vector'][c] = temp_term_vector[0][int(np.squeeze(np.where(self.ns['terms'] == term)))]
+            elif len(temp_term_vector) > 1:
+                self.ns['activation_vector'][c] = temp_term_vector[int(np.squeeze(np.where(self.ns['terms'] == term)))]
+            else:
+                self.ns['activation_vector'][c] = 0
+                c += 1
+        return self.ns['activation_vector']
 
-    def correlate_ge_ns(self,ge_vector,ns_vector):
-        return 1
+    def correlate_ge_ns(self, term, entrez):
+        self.generate_ns_vector(term)
+        self.get_ge(entrez)
+        correlation = np.corrcoeff(self.ns['activation_vector'], self.ge[entrez])
+        print 'FUCK YEAAAAHHHHHH'
+        return correlation
 
 
     def make_ge_ns_mat(self):
