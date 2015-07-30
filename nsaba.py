@@ -189,7 +189,7 @@ class Nsaba(object):
     def id_to_terms(self, ID):
         """Finds all of the term heat values of a given ID"""
         if self.is_id(ID):
-            ind = int(np.squeeze(np.where(self.ns['id_x_features'] == ID))[0])
+            ind = int(np.squeeze(np.where(self.ns['id_x_features'] == ID)[0]))
             self.ns['temp_term'] = list(self.ns['mni_term_table'].iloc[ind][1:])
             return self.ns['temp_term']
         else:
@@ -203,36 +203,98 @@ class Nsaba(object):
         else:
             return 'Not an ID of a study in NMI space'
 
-<<<<<<< HEAD
-    def CoordtoTerms(self, coord):
+    def coord_to_terms(self, coord):
         '''Returns the vector of term heats for a given (x,y,z) coordinate set.
         If there are multiple studies that mention the same coordinates, the average is taken.'''
-        if self.isLocation(coord):
-            ids = self.CoordtoIDs(coord)
+        if self.is_location(coord):
+            ids = self.coord_to_ids(coord)
             if len(ids) == 1:
                 return self.IDtoTerms(ids[0])
             else:
                 temp = np.zeros((len(ids), 3406))
                 for i in xrange(len(ids)):
-                    temp[i, :] = self.IDtoTerms(ids[i])
-                return list(np.mean(temp, 0))
+                    temp[i, :] = self.id_to_terms(ids[i])
+                self.ns['temp_term'] = list(np.mean(temp, 0))
+                return self.ns['temp_term']
         else:
             return 'not valid location'
 
-    def TermtoIDs(self, term, thresh):
+    def term_to_IDs(self, term, thresh):
         '''Matches a term to the IDs of studies that use that term above a given threshold'''
-        if self.isTerm(term):
+        if self.is_term(term):
             term_all_ids = np.array(self.ns['mni_term_table'][term])
             id_inds = np.squeeze(np.where(term_all_ids > thresh))
-            return self.ns['id_x_features'][id_inds]
+            self.ns['temp_IDs'] = self.ns['id_x_features'][id_inds]
+            return self.ns['temp_IDs'] 
         else:
             return 'This is not a valid term'
 
-    def TermtoCoords(self, term, thresh):
+    def term_to_coords(self, term, thresh):
         '''Finds the coordinates that are associated with a given term up to a given threshold'''
-        ids = self.TermtoIDs(term, thresh)
-        coords = [self.IDtoCoords(i) for i in ids]
-        return coords
+        ids = self.term_to_ids(term, thresh)
+        self.ns['temp_coords'] = [self.id_to_coords(i) for i in ids]
+        return self.ns['temp_coords']
+
+    def calc_distance(self, coord1, coord2):
+        '''Calculates Euclidian distance between two coordinates'''
+        dist = np.sqrt((coord1[0]-coord2[0])**2 + (coord1[1]-coord2[1])**2 + (coord1[2]-coord2[2])**2);
+        return dist
+
+    def find_neighbors(self, coord, dist):
+        neighbors = [];
+        for x in xrange(int(coord[0]-(dist+1)),int(coord[0]+(dist+1))):
+            for y in xrange(int(coord[1]-(dist+1)),int(coord[1]+(dist+1))):
+                for z in xrange(int(coord[2]-(dist+1)),int(coord[2]+(dist+1))):
+                    if calc_distance(coord,(x,y,z)) == dist:
+                        neighbors.append((float(x),float(y),float(z)))    
+        return neighbors
+  
+    def sphere(self, coord,maxDist):
+        '''Finds every point in a sphere around a given point of radius maxDist'''
+        ind_sphere = [];
+        for d in xrange(maxDist):
+            ind_sphere.append(find_neighbors(coord,d));
+        return ind_sphere
+    
+    
+    
+    def assign_weights(self, ind_sphere,weight = 2):
+        '''Assigns weights to a point sphere produced by the sphere method'''
+        '''weight must be >1'''
+        weight_vector = np.ones((1,len(ind_sphere)));  
+        for layer in xrange(1,len(ind_sphere)):
+            weight_vector[0,layer] = 1/(float(layer)*weight)
+    
+        return weight_vector
+
+
+    #estimating term weights of unknown location
+
+    def term_vector_of_unknown_point(self, coord, maxDist):   
+        '''Estimates the terms of an unknown point by drawing from known points around it using a sphere of radius maxDist'''
+        if self.is_location(coord) == True:
+            return self.coord_to_terms(coord)
+        else:
+            ind_sphere = self.sphere(coord,maxDist);
+            weight_vect = self.assign_weights(ind_sphere);
+            self.ns['termVect'] = [];
+            for layer in xrange(len(ind_sphere)):
+                for c in ind_sphere[layer]:
+                    #print c
+                    if self.is_location(c) == True:
+                        print 'found a nearby point'
+                        print c
+                        if ~np.isnan(np.sum(self.coord_to_terms(c))):
+                            temp = self.coord_to_terms(c);
+                            self.ns['termVect'].append([t*weight_vect[0,layer] for t in temp])
+                            print weight_vect[0,layer]
+        
+            if len(self.ns['termVect'])>1:
+                #Need a better way to normalize
+                self.ns['termVect'] = np.sum(self.ns['termVect'],0);
+            
+            return self.ns['termVect']
+        
 
     def make_ge_ns_mat(self):
         if self.__check_static_members() == 1:
