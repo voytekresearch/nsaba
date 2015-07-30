@@ -13,9 +13,9 @@ Methods to analyze human gene expression data from Neurosynth in conjunction wit
     Nsaba.aba_load(aba_path)
     Nsaba.ns_load(ns_path)
 
+    entrez_ids = ['7889', '3', '24']
     alz = Nsaba()
-
-    alz.get_ge(['7889', '3', '24'])
+    alz.get_ge(entrez_ids)
     alz.get_ns_act('alzheimer', .005)
     mat = alz.make_ge_ns_mat()
 
