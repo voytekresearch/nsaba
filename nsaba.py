@@ -87,6 +87,17 @@ class Nsaba(object):
         cls.ns['id_x_features'] = np.array(cls.ns['mni_term_table'])
         cls.ns['database_labels'] = df.columns.values
         print '%s keys loaded.' % ns_files[1]
+
+        cls.ns['id_dict'] = {}
+        c = 0
+        for i in cls.ns['study_ids']:
+            if i not in cls.ns['id_dict']:
+                cls.ns['id_dict'][i] = [(cls.ns['x_mni'][c], cls.ns['y_mni'][c], cls.ns['z_mni'][c])];
+                c += 1
+            elif (cls.ns['x_mni'][c], cls.ns['y_mni'][c], cls.ns['z_mni'][c]) in cls.ns['id_dict'][i]:
+                c += 1
+            else:
+                cls.ns['id_dict'][i].append((cls.ns['x_mni'][c], cls.ns['y_mni'][c], cls.ns['z_mni'][c]))
         return 0
 
     def __init__(self):
@@ -132,6 +143,68 @@ class Nsaba(object):
             self.ge[entrez_id].append(len(ge_mat[0]))
 
         return 0
+
+    #bookeeping methods
+    def isTerm(self, term):
+        '''Checks if this term is in the neurosynth database'''
+        if term in self.ns['mni_term_table']:
+            return True
+        else:
+            return False
+
+    def isLocation(self, coords):
+        '''Checks if coordinate set (x,y,z) is mentioned in any studies'''
+        if np.floor(coords[0]) in np.floor(self.ns['x_mni']):
+            #ind = x_vals.index(coords[0]);
+
+            for xind in xrange(len(self.ns['x_mni'])):
+                if coords[0] == self.ns['x_mni'][xind]:
+                    if np.floor(self.ns['y_mni'][xind]) == np.floor(coords[1]):
+                        #print '2'
+                        if np.floor(self.ns['z_mni'][xind]) == np.floor(coords[2]):
+                            return True
+            else:
+                return False
+        else:
+            return False
+
+    def isID(self, ID):
+        '''Checks if ID is an ID with NMI coordinates'''
+        if ID in self.ns['id_dict']:
+            return True
+        else:
+            return False
+
+    def CoordtoIDs(self, coord):
+        '''Uses the study dictionary above to find study ids from x,y,z coordinates'''
+        if self.isLocation(coord):
+            self.ns['temp_IDs'] = []
+            for i, coords in self.ns['id_dict'].items():
+                if coord in coords:
+                    self.ns['temp_IDs'].append(i)
+            return self.ns['temp_IDs']
+        else:
+            return "These coordinates don't match any studies"
+
+    def IDtoTerms(self, ID):
+        '''Finds all of the term heat values of a given ID'''
+        if self.isID(ID):
+            ind = int(np.squeeze(np.where(self.ns['id_x_features'] == ID))[0])
+            self.ns['temp_term'] = list(self.ns['mni_term_table'].iloc[ind][1:])
+            return self.ns['temp_term']
+        else:
+            return 'Not an ID of a study in NMI space';
+
+    def IDtoCoords(self, ID):
+        '''Finds coordinates associated with a given study ID'''
+        if self.isID(ID):
+            self.ns['temp_coords'] = self.ns['id_dict'][ID]
+            return self.ns['temp_coords']
+        else:
+            return 'Not an ID of a study in NMI space'
+
+
+
 
     def make_ge_ns_mat(self):
         if self.__check_static_members() == 1:
