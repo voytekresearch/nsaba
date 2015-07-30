@@ -84,7 +84,7 @@ class Nsaba(object):
         term_table = pd.read_table(os.path.join(ns_path, ns_files[1]))
         cls.ns['mni_term_table'] = term_table.loc[term_table['pmid'].isin(cls.ns['unique_ids'])]
         cls.ns['terms'] = term_table.columns.values
-        cls.ns['id_x_features'] = np.array(cls.ns['mni_term_table'])
+        cls.ns['id_x_features'] = np.array(cls.ns['mni_term_table']['pmid'])
         cls.ns['database_labels'] = df.columns.values
         print '%s keys loaded.' % ns_files[1]
 
@@ -203,8 +203,35 @@ class Nsaba(object):
         else:
             return 'Not an ID of a study in NMI space'
 
+    def CoordtoTerms(self, coord):
+        '''Returns the vector of term heats for a given (x,y,z) coordinate set.
+        If there are multiple studies that mention the same coordinates, the average is taken.'''
+        if self.isLocation(coord):
+            ids = self.CoordtoIDs(coord)
+            if len(ids) == 1:
+                return self.IDtoTerms(ids[0])
+            else:
+                temp = np.zeros((len(ids), 3406))
+                for i in xrange(len(ids)):
+                    temp[i, :] = self.IDtoTerms(ids[i])
+                return list(np.mean(temp, 0))
+        else:
+            return 'not valid location'
 
+    def TermtoIDs(self, term, thresh):
+        '''Matches a term to the IDs of studies that use that term above a given threshold'''
+        if self.isTerm(term):
+            term_all_ids = np.array(self.ns['mni_term_table'][term])
+            id_inds = np.squeeze(np.where(term_all_ids > thresh))
+            return self.ns['id_x_features'][id_inds]
+        else:
+            return 'This is not a valid term'
 
+    def TermtoCoords(self, term, thresh):
+        '''Finds the coordinates that are associated with a given term up to a given threshold'''
+        ids = self.TermtoIDs(term, thresh)
+        coords = [self.IDtoCoords(i) for i in ids]
+        return coords
 
     def make_ge_ns_mat(self):
         if self.__check_static_members() == 1:
