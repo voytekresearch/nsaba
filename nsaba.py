@@ -33,7 +33,8 @@ class Nsaba(object):
         'z_mni': None,
     }
     nsaba = {
-        'linear_regression': None
+        'linear_regression': None,
+        'correlation': None
     }
 
     @classmethod
@@ -354,10 +355,17 @@ class Nsaba(object):
         self.generate_ns_vector(term)
         self.get_ge(entrez)
         correlation = np.corrcoef(self.ns['activation_vector'], self.ge[entrez[0]][0])
+        self.nsaba['correlation'] = correlation[0][1]
         print 'AAWWWW YEAAAAHHHHHH'
         print correlation
-        self.nsaba['linear_regression'] = correlation[0][1]
-        return self.nsaba['linear_regression']
+
+        X = np.vstack([self.ns['activation_vector'], np.ones(len(self.ns['activation_vector']))]).T
+        y = self.ge[entrez[0]][0]
+        m, c = np.linalg.lstsq(X, y)[0]
+        self.nsaba['linear_regression'] = m, c
+
+        print m, c
+        return self.nsaba['correlation'], self.nsaba['linear_regression']
 
 
     def make_ge_ns_mat(self):
