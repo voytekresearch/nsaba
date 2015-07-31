@@ -32,6 +32,9 @@ class Nsaba(object):
         'y_mni': None,
         'z_mni': None,
     }
+    nsaba = {
+        'linear_regression': None
+    }
 
     @classmethod
     def aba_load(cls, aba_path, csv_names=None):
@@ -93,12 +96,12 @@ class Nsaba(object):
         c = 0
         for i in cls.ns['study_ids']:
             if i not in cls.ns['id_dict']:
-                cls.ns['id_dict'][i] = [(cls.ns['x_mni'][c], cls.ns['y_mni'][c], cls.ns['z_mni'][c])]
+                cls.ns['id_dict'][i] = [(np.floor(cls.ns['x_mni'][c]), np.floor(cls.ns['y_mni'][c]), np.floor(cls.ns['z_mni'][c]))]
                 c += 1
-            elif (cls.ns['x_mni'][c], cls.ns['y_mni'][c], cls.ns['z_mni'][c]) in cls.ns['id_dict'][i]:
+            elif (np.floor(cls.ns['x_mni'][c]), np.floor(cls.ns['y_mni'][c]), np.floor(cls.ns['z_mni'][c])) in cls.ns['id_dict'][i]:
                 c += 1
             else:
-                cls.ns['id_dict'][i].append((cls.ns['x_mni'][c], cls.ns['y_mni'][c], cls.ns['z_mni'][c]))
+                cls.ns['id_dict'][i].append((np.floor(cls.ns['x_mni'][c]), np.floor(cls.ns['y_mni'][c]), np.floor(cls.ns['z_mni'][c])))
         return 0
 
     def __init__(self):
@@ -163,15 +166,16 @@ class Nsaba(object):
             return False
 
     def is_location(self, coords):
+        # big issue with rounding going on
         """Checks if coordinate set (x,y,z) is mentioned in any studies"""
-        if np.floor(coords[0]) in np.floor(self.ns['x_mni']):
+        if coords[0] in self.ns['x_mni']:
             # ind = x_vals.index(coords[0]);
 
             for xind in xrange(len(self.ns['x_mni'])):
                 if coords[0] == self.ns['x_mni'][xind]:
-                    if np.floor(self.ns['y_mni'][xind]) == np.floor(coords[1]):
+                    if self.ns['y_mni'][xind] == coords[1]:
                         # print '2'
-                        if np.floor(self.ns['z_mni'][xind]) == np.floor(coords[2]):
+                        if self.ns['z_mni'][xind] == coords[2]:
                             return True
             else:
                 return False
@@ -187,12 +191,15 @@ class Nsaba(object):
 
     def coord_to_ids(self, coord):
         """Uses the study dictionary above to find study ids from x,y,z coordinates"""
+        self.ns['temp_IDs'] = []
         if self.is_location(coord):
-            self.ns['temp_IDs'] = []
+
             for i, coords in self.ns['id_dict'].items():
                 if coord in coords:
+
                     self.ns['temp_IDs'].append(i)
-            return self.ns['temp_IDs']
+                    print self.ns['temp_IDs']
+                    return self.ns['temp_IDs']
         else:
             return "These coordinates don't match any studies"
 
@@ -216,16 +223,18 @@ class Nsaba(object):
     def coord_to_terms(self, coord):
         '''Returns the vector of term heats for a given (x,y,z) coordinate set.
         If there are multiple studies that mention the same coordinates, the average is taken.'''
+        self.ns['temp_term'] = []
         if self.is_location(coord):
             ids = self.coord_to_ids(coord)
-            if len(ids) == 1:
-                return self.id_to_terms(ids[0])
-            else:
-                temp = np.zeros((len(ids), 3406))
-                for i in xrange(len(ids)):
-                    temp[i, :] = self.id_to_terms(ids[i])
-                self.ns['temp_term'] = list(np.mean(temp, 0))
-                return self.ns['temp_term']
+            if ids:
+                if len(ids) == 1:
+                    return self.id_to_terms(ids[0])
+                else:
+                    temp = np.zeros((len(ids), 3406))
+                    for i in xrange(len(ids)):
+                        temp[i, :] = self.id_to_terms(ids[i])
+                    self.ns['temp_term'] = list(np.mean(temp, 0))
+                    return self.ns['temp_term']
         else:
             return 'not valid location'
 
@@ -261,12 +270,10 @@ class Nsaba(object):
   
     def sphere(self, coord, maxDist):
         '''Finds every point in a sphere around a given point of radius maxDist'''
-        ind_sphere = [];
+        ind_sphere = []
         for d in xrange(maxDist):
             ind_sphere.append(self.find_neighbors(coord, d))
         return ind_sphere
-    
-    
     
     def assign_weights(self, ind_sphere,weight = 2):
         '''Assigns weights to a point sphere produced by the sphere method'''
@@ -281,31 +288,38 @@ class Nsaba(object):
     def term_vector_of_unknown_point(self, coord, maxDist):   
         '''Estimates the terms of an unknown point by drawing from known points around it using a sphere of radius maxDist'''
         self.ns['termVect'] = []
-        if self.is_location(coord) == True:
-            self.ns['termVect'] = self.coord_to_terms(coord)
-            print 'This point exists!'
-            return self.ns['termVect']
+
+        if self.is_location(coord):
+            if self.coord_to_terms(coord):
+                self.ns['termVect'] = self.coord_to_terms(coord)
+                print 'This point exists!'
+                return self.ns['termVect']
+            # print self.ns['temp_term']
+            else:
+                print 'missing study id'
+                return np.zeros(3406)
+
         else:
             ind_sphere = self.sphere(coord, maxDist)
             weight_vect = self.assign_weights(ind_sphere)
             self.ns['termVect'] = []
             for layer in xrange(len(ind_sphere)):
                 for c in ind_sphere[layer]:
-                    if self.is_location(c) == True:
+                    if self.is_location(c):
                         print 'found a nearby point'
                         print c
-                        if ~np.isnan(np.sum(self.coord_to_terms(c))):
-                            temp = self.coord_to_terms(c)
+                        temp = self.coord_to_terms(c)
+                        if temp is not None:
                             self.ns['termVect'].append([t*weight_vect[0, layer] for t in temp])
-                            print weight_vect[0, layer]
+                            # print weight_vect[0, layer]
 
             if len(self.ns['termVect']) > 1:
-                #Need a better way to normalize
+                # Need a better way to normalize
                 self.ns['termVect'] = np.sum(self.ns['termVect'], 0)
-
+            # print type(self.ns['termVect']), self.ns['termVect']
             return self.ns['termVect']
 
-    #NS/ABA methods
+    # NS/ABA methods
     def generate_ns_vector(self, term):
         ##
         if not self.aba['xyz']:
@@ -315,27 +329,35 @@ class Nsaba(object):
         c = 0
         for xyz_set in self.aba['xyz']:
             xyz_set = np.floor(xyz_set).tolist()
-            #print xyz_set
+            print xyz_set
             temp_term_vector = self.term_vector_of_unknown_point(xyz_set, 5)
+            #print temp_term_vector
             if not isinstance(temp_term_vector, list):
                 temp_term_vector = list(temp_term_vector)
-            #print type(temp_term_vector)
-            #print temp_term_vector
+            # print type(temp_term_vector)
+            # print temp_term_vector
             if len(temp_term_vector) == 1:
                 self.ns['activation_vector'][c] = temp_term_vector[0][int(np.squeeze(np.where(self.ns['terms'] == term)))]
+                #print 1, temp_term_vector
+                c += 1
             elif len(temp_term_vector) > 1:
                 self.ns['activation_vector'][c] = temp_term_vector[int(np.squeeze(np.where(self.ns['terms'] == term)))]
+                #print 2, temp_term_vector
+                c += 1
             else:
                 self.ns['activation_vector'][c] = 0
+                print 'fuck'
                 c += 1
         return self.ns['activation_vector']
 
     def correlate_ge_ns(self, term, entrez):
         self.generate_ns_vector(term)
         self.get_ge(entrez)
-        correlation = np.corrcoeff(self.ns['activation_vector'], self.ge[entrez])
-        print 'FUCK YEAAAAHHHHHH'
-        return correlation
+        correlation = np.corrcoef(self.ns['activation_vector'], self.ge[entrez[0]][0])
+        print 'AAWWWW YEAAAAHHHHHH'
+        print correlation
+        self.nsaba['linear_regression'] = correlation[0][1]
+        return self.nsaba['linear_regression']
 
 
     def make_ge_ns_mat(self):
