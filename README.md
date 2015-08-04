@@ -23,10 +23,15 @@ Save the decompressed output of this file to somewhere you will remember (/Users
     Nsaba.ns_load(ns_path)
 
     entrez_id = [740]
-	myterm = 'alzheimer'
+	my_term = 'alzheimer'
     alz = Nsaba()
-    alz.correlate_ge_ns(myterm,entrez_id)
-	print alz.['correlation']
-	print alz.['Linear Regression']
+    
+    alz.get_ge(entrez_id)
+    alz.generate_ns_vector(my_term)
+    
+    # Run Science
+    
+    
+![Science Sloth!](http://gifts.worldwildlife.org/gift-center/Images/large-species-photo/large-Three-toed-Sloth-photo.jpg, "Science!")
 
 
