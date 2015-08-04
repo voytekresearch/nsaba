@@ -6,6 +6,7 @@ Authors: Simon Haxby, Scott Susi, Torben Noto
 Last Updated: 7/26/2015
 """
 import numpy as np
+import scipy as sp
 import pandas as pd
 import os
 import itertools
@@ -68,7 +69,8 @@ class Nsaba(object):
         cls.aba['probe_mat'] = cls.aba['probe_df'].as_matrix()
         print '%s loaded.' % csv_names[2]
 
-        cls.aba['mni_coords'] = cls.aba['si_mat'][1:, 10:].astype(float)
+        raw_coords = cls.aba['si_mat'][1:, 10:].astype(float)
+        cls.aba['mni_coords'] = sp.spatial.KDTree(raw_coords)
         print "Nsaba.aba['mni_coords'] initialized."
 
         return 0
@@ -111,8 +113,7 @@ class Nsaba(object):
     def __init__(self):
 
         self.ge = {}
-        # ...
-        # ...
+        self.term_act = []
 
     def get_ge(self, entrez_ids):
 
@@ -152,7 +153,7 @@ class Nsaba(object):
         return 0
 
     def get_aba_xyz(self):
-        xvals = self.aba['si_df']['mni_x']
+        xvals = self.aba['mni_coords']
         yvals = self.aba['si_df']['mni_y']
         zvals = self.aba['si_df']['mni_z']
         self.aba['xyz'] = zip(xvals, yvals, zvals)
@@ -210,7 +211,7 @@ class Nsaba(object):
             return 'Not an ID of a study in NMI space'
 
     def id_to_coords(self, ID):
-        """Finds coordinates associated with a given study ID"""
+        """ Finds coordinates associated with a given study ID """
         if self.is_id(ID):
             self.ns['temp_coords'] = self.ns['id_dict'][ID]
             return self.ns['temp_coords']
@@ -218,8 +219,8 @@ class Nsaba(object):
             return 'Not an ID of a study in NMI space'
 
     def coord_to_terms(self, coord):
-        '''Returns the vector of term heats for a given (x,y,z) coordinate set.
-        If there are multiple studies that mention the same coordinates, the average is taken.'''
+        """Returns the vector of term heats for a given (x,y,z) coordinate set.
+        If there are multiple studies that mention the same coordinates, the average is taken."""
         if self.is_location(coord):
             ids = self.coord_to_ids(coord)
             if len(ids) == 1:
@@ -234,7 +235,7 @@ class Nsaba(object):
             return 'not valid location'
 
     def term_to_ids(self, term, thresh):
-        '''Matches a term to the IDs of studies that use that term above a given threshold'''
+        """Matches a term to the IDs of studies that use that term above a given threshold"""
         if self.is_term(term):
             term_all_ids = np.array(self.ns['mni_term_table'][term])
             id_inds = np.squeeze(np.where(term_all_ids > thresh))
@@ -249,35 +250,7 @@ class Nsaba(object):
         self.ns['temp_coords'] = [self.id_to_coords(i) for i in ids]
         return self.ns['temp_coords']
 
-    def calc_distance(self, coord1, coord2):
-        '''Calculates Euclidian distance between two coordinates'''
-        dist = np.sqrt((coord1[0] - coord2[0]) ** 2 + (coord1[1] - coord2[1]) ** 2 + (coord1[2] - coord2[2]) ** 2);
-        return dist
-
-    def find_neighbors(self, coord, dist):
-        neighbors = []
-        for x in xrange(int(coord[0] - (dist + 1)), int(coord[0] + (dist + 1))):
-            for y in xrange(int(coord[1] - (dist + 1)), int(coord[1] + (dist + 1))):
-                for z in xrange(int(coord[2] - (dist + 1)), int(coord[2] + (dist + 1))):
-                    if self.calc_distance(coord, (x, y, z)) == dist:
-                        neighbors.append((float(x), float(y), float(z)))
-        return neighbors
-
-    def sphere(self, coord, maxDist):
-        '''Finds every point in a sphere around a given point of radius maxDist'''
-        ind_sphere = [];
-        for d in xrange(maxDist):
-            ind_sphere.append(self.find_neighbors(coord, d))
-        return ind_sphere
-
-    def assign_weights(self, ind_sphere, weight=2):
-        '''Assigns weights to a point sphere produced by the sphere method'''
-        '''weight must be >1'''
-        weight_vector = np.ones((1, len(ind_sphere)))
-        for layer in xrange(1, len(ind_sphere)):
-            weight_vector[0, layer] = 1 / (float(layer) * weight)
-
-        return weight_vector
+    def
 
     # estimating term weights of unknown location
     def term_vector_of_unknown_point(self, coord, maxDist):
@@ -309,15 +282,11 @@ class Nsaba(object):
 
     # NS/ABA methods
     def generate_ns_vector(self, term):
-        ##
-        if not self.aba['xyz']:
-            self.get_aba_xyz()
 
         self.ns['activation_vector'] = np.zeros((len(self.aba['xyz'])))
         c = 0
-        for xyz_set in self.aba['xyz']:
-            xyz_set = np.floor(xyz_set).tolist()
-            # print xyz_set
+        for xyz_set in self.aba['mni_coords']:
+            xyz_set = np.floor(xyz_set)
             temp_term_vector = self.term_vector_of_unknown_point(xyz_set, 5)
             if not isinstance(temp_term_vector, list):
                 temp_term_vector = list(temp_term_vector)
@@ -340,7 +309,7 @@ class Nsaba(object):
         print 'FUCK YEAAAAHHHHHH'
         return correlation
 
-    def make_ge_ns_mat(self):
+    def make_ge_ns_mat(self, term, entrez):
         if self.__check_static_members() == 1:
             return 1
 
@@ -353,10 +322,6 @@ class Nsaba(object):
             if val is None:
                 print "Unassigned Nsaba 'aba' static variable: see Nsaba.aba_load(path)"
                 return 1
-
-        # Until kinks are ironed out ...
-        return 0
-
         for val in self.ns.itervalues():
             if val is None:
                 print "Unassigned Nsaba 'ns' static variable: see Nsaba.ns_load(path)"
