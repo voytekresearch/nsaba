@@ -31,7 +31,8 @@ Save the decompressed output of this file to somewhere you will remember (/Users
     
     # Run Science
     
-    
-![Science Sloth!](http://gifts.worldwildlife.org/gift-center/Images/large-species-photo/large-Three-toed-Sloth-photo.jpg, "Science!")
+## Science Sloth!    
+![Science Sloth!](http://gifts.worldwildlife.org/gift-center/Images/large-species-photo/large-Three-toed-Sloth-photo.jpg 
+    "Science Sloth preparing to do Science!")
 
 
