@@ -8,6 +8,7 @@ Last Updated: 7/26/2015
 import numpy as np
 import pandas as pd
 import os
+import itertools
 
 
 class Nsaba(object):
@@ -26,7 +27,8 @@ class Nsaba(object):
         'terms': None,
         'study_ids': None,
         'unique_ids': None,
-        'ids_x_features': None,
+        'id_x_features': None,
+        'id_dict': None,
         'database_labels': None,
         'x_mni': None,
         'y_mni': None,
@@ -34,7 +36,7 @@ class Nsaba(object):
     }
 
     @classmethod
-    def aba_load(cls, aba_path, csv_names=None):
+    def aba_load(cls, aba_path=".", csv_names=None):
         """Initialization of 'aba' dictionary"""
         if not csv_names:
             csv_names = [
@@ -47,15 +49,19 @@ class Nsaba(object):
 
         print 'This may take a minute or two ...'
 
-        csv_path = os.path.join(aba_path, csv_names[0])
-        cls.aba['exp_df'] = pd.read_csv(csv_path)
-        cls.aba['exp_mat'] = cls.aba['exp_df'].as_matrix()
-        print '%s loaded.' % csv_names[0]
-
         csv_path = os.path.join(aba_path, csv_names[1])
         cls.aba['si_df'] = pd.read_csv(csv_path)
         cls.aba['si_mat'] = cls.aba['si_df'].as_matrix()
         print '%s loaded.' % csv_names[1]
+
+        csv_path = os.path.join(aba_path, csv_names[0])
+        cls.aba['exp_df'] = pd.read_csv(csv_path, header=None)
+        cls.aba['exp_df'].columns = list(
+            itertools.chain.from_iterable(
+                [['probe_id'], range(cls.aba['si_df'].shape[0])]))
+
+        cls.aba['exp_mat'] = cls.aba['exp_df'].as_matrix()
+        print '%s loaded.' % csv_names[0]
 
         csv_path = os.path.join(aba_path, csv_names[2])
         cls.aba['probe_df'] = pd.read_csv(csv_path)
@@ -64,10 +70,11 @@ class Nsaba(object):
 
         cls.aba['mni_coords'] = cls.aba['si_mat'][1:, 10:].astype(float)
         print "Nsaba.aba['mni_coords'] initialized."
+
         return 0
 
     @classmethod
-    def ns_load(cls, ns_path, ns_files=None):
+    def ns_load(cls, ns_path=".", ns_files=None):
         """Initialization of 'ns' dictionary"""
         if not ns_files:
             ns_files = ['database.txt', 'features.txt']
@@ -89,8 +96,8 @@ class Nsaba(object):
         cls.ns['database_labels'] = df.columns.values
         print '%s keys loaded.' % ns_files[1]
 
-        cls.ns['id_dict'] = {}
         c = 0
+        cls.ns['id_dict'] = {}
         for i in cls.ns['study_ids']:
             if i not in cls.ns['id_dict']:
                 cls.ns['id_dict'][i] = [(cls.ns['x_mni'][c], cls.ns['y_mni'][c], cls.ns['z_mni'][c])]
@@ -109,10 +116,8 @@ class Nsaba(object):
 
     def get_ge(self, entrez_ids):
 
-        '''
         if self.__check_static_members() == 1:
-            print ' '
-            #return 1
+            return 1
 
         try:
             iter(entrez_ids)
@@ -123,28 +128,27 @@ class Nsaba(object):
             if isinstance(entrez_ids, str):
                 print "Invalid parameter form; please contain entrez ids as 'str' types in iterable container"
                 return 1
-        '''
 
         for entrez_id in entrez_ids:
-            probe_ids = self.aba['probe_df'].loc[self.aba['probe_df']['entrez_id'] == entrez_id].index.tolist()
+            probe_ids = self.aba['probe_df'].loc[self.aba['probe_df']['entrez_id']
+                                                 == entrez_id]['probe_id'].tolist()
 
             if len(probe_ids) == 0:
                 print 'Entrez ID: %s not registered with ABA database' % entrez_id
                 continue
 
-            ge_df = pd.DataFrame(self.aba['exp_df'].loc[probe_ids.pop(0) - 1, :])
-            for probe_id in probe_ids:
-                ge_df = ge_df.join(self.aba['exp_df'].loc[probe_id - 1, :])
+            ge_df = self.aba['exp_df'].loc[self.aba['exp_df']['probe_id'].isin(probe_ids)]
+            ge_mat = ge_df.as_matrix().astype(float)[:, 1:].T
 
-            ge_mat = ge_df.as_matrix().astype(float)[1:, :]
             self.ge[entrez_id] = []
 
-            self.ge[entrez_id].append([np.mean(row) for row in ge_mat])
+            self.ge[entrez_id].append(np.mean(ge_mat, axis=1))
             diff_arr = [np.amax(row) - np.amin(row) for row in ge_mat]
             self.ge[entrez_id].append(diff_arr)
             self.ge[entrez_id].append(np.amax(diff_arr))
             self.ge[entrez_id].append(len(ge_mat[0]))
-        self.ge[entrez_id] = np.squeeze(self.ge[entrez_id])
+            self.ge[entrez_id] = np.squeeze(self.ge[entrez_id])
+
         return 0
 
     def get_aba_xyz(self):
@@ -235,7 +239,7 @@ class Nsaba(object):
             term_all_ids = np.array(self.ns['mni_term_table'][term])
             id_inds = np.squeeze(np.where(term_all_ids > thresh))
             self.ns['temp_IDs'] = self.ns['id_x_features'][id_inds]
-            return self.ns['temp_IDs'] 
+            return self.ns['temp_IDs']
         else:
             return 'This is not a valid term'
 
@@ -247,38 +251,36 @@ class Nsaba(object):
 
     def calc_distance(self, coord1, coord2):
         '''Calculates Euclidian distance between two coordinates'''
-        dist = np.sqrt((coord1[0]-coord2[0])**2 + (coord1[1]-coord2[1])**2 + (coord1[2]-coord2[2])**2);
+        dist = np.sqrt((coord1[0] - coord2[0]) ** 2 + (coord1[1] - coord2[1]) ** 2 + (coord1[2] - coord2[2]) ** 2);
         return dist
 
     def find_neighbors(self, coord, dist):
         neighbors = []
-        for x in xrange(int(coord[0]-(dist+1)), int(coord[0]+(dist+1))):
-            for y in xrange(int(coord[1]-(dist+1)), int(coord[1]+(dist+1))):
-                for z in xrange(int(coord[2]-(dist+1)),int(coord[2]+(dist+1))):
+        for x in xrange(int(coord[0] - (dist + 1)), int(coord[0] + (dist + 1))):
+            for y in xrange(int(coord[1] - (dist + 1)), int(coord[1] + (dist + 1))):
+                for z in xrange(int(coord[2] - (dist + 1)), int(coord[2] + (dist + 1))):
                     if self.calc_distance(coord, (x, y, z)) == dist:
                         neighbors.append((float(x), float(y), float(z)))
         return neighbors
-  
+
     def sphere(self, coord, maxDist):
         '''Finds every point in a sphere around a given point of radius maxDist'''
         ind_sphere = [];
         for d in xrange(maxDist):
             ind_sphere.append(self.find_neighbors(coord, d))
         return ind_sphere
-    
-    
-    
-    def assign_weights(self, ind_sphere,weight = 2):
+
+    def assign_weights(self, ind_sphere, weight=2):
         '''Assigns weights to a point sphere produced by the sphere method'''
         '''weight must be >1'''
         weight_vector = np.ones((1, len(ind_sphere)))
         for layer in xrange(1, len(ind_sphere)):
-            weight_vector[0, layer] = 1/(float(layer)*weight)
-    
+            weight_vector[0, layer] = 1 / (float(layer) * weight)
+
         return weight_vector
 
     # estimating term weights of unknown location
-    def term_vector_of_unknown_point(self, coord, maxDist):   
+    def term_vector_of_unknown_point(self, coord, maxDist):
         '''Estimates the terms of an unknown point by drawing from known points around it using a sphere of radius maxDist'''
         self.ns['termVect'] = []
         if self.is_location(coord) == True:
@@ -296,16 +298,16 @@ class Nsaba(object):
                         print c
                         if ~np.isnan(np.sum(self.coord_to_terms(c))):
                             temp = self.coord_to_terms(c)
-                            self.ns['termVect'].append([t*weight_vect[0, layer] for t in temp])
+                            self.ns['termVect'].append([t * weight_vect[0, layer] for t in temp])
                             print weight_vect[0, layer]
 
             if len(self.ns['termVect']) > 1:
-                #Need a better way to normalize
+                # Need a better way to normalize
                 self.ns['termVect'] = np.sum(self.ns['termVect'], 0)
 
             return self.ns['termVect']
 
-    #NS/ABA methods
+    # NS/ABA methods
     def generate_ns_vector(self, term):
         ##
         if not self.aba['xyz']:
@@ -315,14 +317,15 @@ class Nsaba(object):
         c = 0
         for xyz_set in self.aba['xyz']:
             xyz_set = np.floor(xyz_set).tolist()
-            #print xyz_set
+            # print xyz_set
             temp_term_vector = self.term_vector_of_unknown_point(xyz_set, 5)
             if not isinstance(temp_term_vector, list):
                 temp_term_vector = list(temp_term_vector)
-            #print type(temp_term_vector)
-            #print temp_term_vector
+            # print type(temp_term_vector)
+            # print temp_term_vector
             if len(temp_term_vector) == 1:
-                self.ns['activation_vector'][c] = temp_term_vector[0][int(np.squeeze(np.where(self.ns['terms'] == term)))]
+                self.ns['activation_vector'][c] = temp_term_vector[0][
+                    int(np.squeeze(np.where(self.ns['terms'] == term)))]
             elif len(temp_term_vector) > 1:
                 self.ns['activation_vector'][c] = temp_term_vector[int(np.squeeze(np.where(self.ns['terms'] == term)))]
             else:
@@ -337,7 +340,6 @@ class Nsaba(object):
         print 'FUCK YEAAAAHHHHHH'
         return correlation
 
-
     def make_ge_ns_mat(self):
         if self.__check_static_members() == 1:
             return 1
@@ -351,6 +353,10 @@ class Nsaba(object):
             if val is None:
                 print "Unassigned Nsaba 'aba' static variable: see Nsaba.aba_load(path)"
                 return 1
+
+        # Until kinks are ironed out ...
+        return 0
+
         for val in self.ns.itervalues():
             if val is None:
                 print "Unassigned Nsaba 'ns' static variable: see Nsaba.ns_load(path)"
