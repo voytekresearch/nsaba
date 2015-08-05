@@ -56,8 +56,7 @@ class Nsaba(object):
         cls.aba['probe_df'] = pd.read_csv(csv_path)
         print '%s loaded.' % csv_names[2]
 
-        raw_coords = cls.aba['si_df'].loc[:, 'mni_x':'mni_z'].as_matrix().astype(float)
-        cls.aba['mni_coords'] = spatial.KDTree(raw_coords)
+        cls.aba['mni_coords'] = cls.aba['si_df'].loc[:, 'mni_x':'mni_z'].as_matrix().astype(float)
         print "Nsaba.aba['mni_coords'] initialized."
 
 
@@ -75,11 +74,12 @@ class Nsaba(object):
         print "%s loaded." % ns_files[1]
 
     def __init__(self):
-
         self.ge = {}
-        self.term_act = []
+        self.ns_coord_tree = None
+        self.ns_coord_act_df = None
+        self.ns_act_vector = None
 
-    def get_ge(self, entrez_ids):
+    def get_aba_ge(self, entrez_ids):
 
         if self.__check_static_members() == 1:
             return 1
@@ -128,130 +128,76 @@ class Nsaba(object):
             return False
 
     def is_id(self, ID):
-        """Checks if ID is registered"""
+        """ Checks if ID is registered """
         if (self.ns['features_df']['pmid'] == ID).any():
             return True
         else:
             return False
 
     def coord_to_ids(self, coord):
-        """Uses the study dictionary above to find study ids from x,y,z coordinates"""
-        # Use
-        else:
-            return "These coordinates don't match any studies"
+        """ Uses the study dictionary above to find study ids from x,y,z coordinates """
+        # Use Later?
+
+        return
 
     def id_to_terms(self, ID):
-        """Finds all of the term heat values of a given ID"""
-        if self.is_id(ID):
-            ind = int(np.squeeze(np.where(self.ns['id_x_features'] == ID)[0]))
-            self.ns['temp_term'] = list(self.ns['mni_term_table'].iloc[ind][1:])
-            return self.ns['temp_term']
+        """ Finds all of the term heat values of a given ID """
+        # Use Later?
 
-        else:
-            return 'Not an ID of a study in NMI space'
+        return
 
-    def id_to_coords(self, ID):
-        """ Finds coordinates associated with a given study ID """
-        if self.is_id(ID):
-            self.ns['temp_coords'] = self.ns['id_dict'][ID]
-            return self.ns['temp_coords']
-        else:
-            return 'Not an ID of a study in NMI space'
+    def term_to_coords(self, term, thresh=0):
+        """ Finds coordinates associated with a given term.
+        Returns NS coordinate tree and ID/coordinate/activation DataFrame"""
 
-    def coord_to_terms(self, coord):
-        """Returns the vector of term heats for a given (x,y,z) coordinate set.
-        If there are multiple studies that mention the same coordinates, the average is taken."""
-        if self.is_location(coord):
-            ids = self.coord_to_ids(coord)
-            if len(ids) == 1:
-                return self.id_to_terms(ids[0])
-            else:
-                temp = np.zeros((len(ids), 3406))
-                for i in xrange(len(ids)):
-                    temp[i, :] = self.id_to_terms(ids[i])
-                self.ns['temp_term'] = list(np.mean(temp, 0))
-                return self.ns['temp_term']
-        else:
-            return 'not valid location'
+        term_ids_act = self.ns['feature_df'].loc[self.ns['feature_df'][term] > thresh, ['pmid', term]]
+        term_ids = term_ids_act['pmid'].tolist()
+        term_coords = self.ns['database_df'].loc[self.ns['database_df']['id'].isin(term_ids)]
+        ns_coord_tree = spatial.KDTree(term_coords.loc[:, 'x':'z'].as_matrix().astype(float))
 
-    def term_to_ids(self, term, thresh):
-        """Matches a term to the IDs of studies that use that term above a given threshold"""
-        if self.is_term(term):
-            term_all_ids = np.array(self.ns['mni_term_table'][term])
-            id_inds = np.squeeze(np.where(term_all_ids > thresh))
-            self.ns['temp_IDs'] = self.ns['id_x_features'][id_inds]
-            return self.ns['temp_IDs']
-        else:
-            return 'This is not a valid term'
+        term_ids_act.rename(columns={'pmid':'id'}, inplace=True)
+        return ns_coord_tree, term_coords.merge(term_ids_act)
 
-    def term_to_coords(self, term, thresh):
-        '''Finds the coordinates that are associated with a given term up to a given threshold'''
-        ids = self.term_to_ids(term, thresh)
-        self.ns['temp_coords'] = [self.id_to_coords(i) for i in ids]
-        return self.ns['temp_coords']
+    def sphere(self, xyz):
+        """ Returns 3D Array containing coordinates in each layer of the sphere """
+        sphere = []
+        for i, r in enumerate(range(4, 0, -1)):
+            pts = self.ns_coord_tree.query_ball_point(xyz, r)
+            sphere.append(set(map(tuple, self.ns_coord_tree.data[pts])))
+            if i != 0:
+                sphere[i-1] = np.vstack(sphere[i-1].difference(sphere[i]))
+        return sphere.reverse()
 
-    # estimating term weights of unknown location
-    def term_vector_of_unknown_point(self, coord, maxDist):
-        '''Estimates the terms of an unknown point by drawing from known points around it using a sphere of radius maxDist'''
-        self.ns['termVect'] = []
-        if self.is_location(coord) == True:
-            self.ns['termVect'] = self.coord_to_terms(coord)
-            print 'This point exists!'
-            return self.ns['termVect']
-        else:
-            ind_sphere = self.sphere(coord, maxDist)
-            weight_vect = self.assign_weights(ind_sphere)
-            self.ns['termVect'] = []
-            for layer in xrange(len(ind_sphere)):
-                for c in ind_sphere[layer]:
-                    if self.is_location(c) == True:
-                        print 'found a nearby point'
-                        print c
-                        if ~np.isnan(np.sum(self.coord_to_terms(c))):
-                            temp = self.coord_to_terms(c)
-                            self.ns['termVect'].append([t * weight_vect[0, layer] for t in temp])
-                            print weight_vect[0, layer]
+    def get_act_values(self, bucket, weight, term):
+        """ Returns weighted NS activation """
+        bucket_act_vec = []
+        for coords in bucket:
+            bucket_act_vec.append(self.ns_coord_act_df[(self.ns_coord_act_df['x'] == coords[0])
+                                 & (self.ns_coord_act_df['y'] == coords[1]) &
+                                 (self.ns_coord_act_df['z'] == coords[2])][term].mean())
 
-            if len(self.ns['termVect']) > 1:
-                # Need a better way to normalize
-                self.ns['termVect'] = np.sum(self.ns['termVect'], 0)
+        return np.mean(bucket_act_vec)*weight
 
-            return self.ns['termVect']
-
-    # NS/ABA methods
-    def generate_ns_vector(self, term):
-
-        self.ns['activation_vector'] = np.zeros((len(self.aba['xyz'])))
-        c = 0
-        for xyz_set in self.aba['mni_coords']:
-            xyz_set = np.floor(xyz_set)
-            temp_term_vector = self.term_vector_of_unknown_point(xyz_set, 5)
-            if not isinstance(temp_term_vector, list):
-                temp_term_vector = list(temp_term_vector)
-            # print type(temp_term_vector)
-            # print temp_term_vector
-            if len(temp_term_vector) == 1:
-                self.ns['activation_vector'][c] = temp_term_vector[0][
-                    int(np.squeeze(np.where(self.ns['terms'] == term)))]
-            elif len(temp_term_vector) > 1:
-                self.ns['activation_vector'][c] = temp_term_vector[int(np.squeeze(np.where(self.ns['terms'] == term)))]
-            else:
-                self.ns['activation_vector'][c] = 0
-                c += 1
-        return self.ns['activation_vector']
-
-    def correlate_ge_ns(self, term, entrez):
-        self.generate_ns_vector(term)
-        self.get_ge(entrez)
-        correlation = np.corrcoeff(self.ns['activation_vector'], self.ge[entrez])
-        print 'FUCK YEAAAAHHHHHH'
-        return correlation
-
-    def make_ge_ns_mat(self, term, entrez):
+    def get_ns_act(self, term, thresh=0):
         if self.__check_static_members() == 1:
             return 1
 
-    def get_ns_act(self, query, term_freq=.005):
+        self.ns_act_vector = []
+        self.ns_coord_tree, self.ns_coord_act_df = self.term_to_coords(term, thresh
+
+        for xyz in self.aba['mni_coords']:
+            sphere_bucket = self.sphere(xyz)
+            sphere_vals = np.array([0,0])
+            for w, bucket in enumerate(sphere_bucket):
+                weight = 1./(w+1)
+                bucket_mean = self.get_act_values(bucket, weight, term)
+                sphere_vals[0] += bucket_mean
+                sphere_vals[1] += weight
+            act_coeff = sphere_vals[0]/sphere_vals[1]
+            self.ns_act_vector.append(act_coeff)
+
+
+    def make_ge_ns_mat(self, term, entrez):
         if self.__check_static_members() == 1:
             return 1
 
