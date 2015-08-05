@@ -160,13 +160,21 @@ class Nsaba(object):
 
     def sphere(self, xyz):
         """ Returns 3D Array containing coordinates in each layer of the sphere """
-        sphere = []
-        for i, r in enumerate(range(4, 0, -1)):
-            pts = self.ns_coord_tree.query_ball_point(xyz, r)
-            sphere.append(set(map(tuple, self.ns_coord_tree.data[pts])))
-            if i != 0:
-                sphere[i-1] = np.vstack(sphere[i-1].difference(sphere[i]))
-        return sphere.reverse()
+        sphere_bucket = []
+        set_bucket = []
+
+        # Needs work; generalize
+
+        for i, r in enumerate(range(4,0,-1)):
+            pts = self.ns_coord_tree.query_ball_point([-2,6,3], r)
+            set_bucket.append(set(map(tuple, self.ns_coord_tree.data[pts])))
+
+        for i in range(0,3):
+            sphere_bucket.append(list(set_bucket[i].difference(set_bucket[i+1])))
+        sphere_bucket.append(list(set_bucket[3]))
+        rev_iter = reversed(sphere_bucket)
+
+        return [layer for layer in rev_iter]
 
     def get_act_values(self, bucket, weight, term):
         """ Returns weighted NS activation """
