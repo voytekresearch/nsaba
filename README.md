@@ -22,12 +22,13 @@ Save the decompressed output of this file to somewhere you will remember (/Users
     Nsaba.aba_load(aba_path)
     Nsaba.ns_load(ns_path)
 
-    entrez_id = [740]
+    entrez_ids = [740, 88]
 	my_term = 'alzheimer'
     alz = Nsaba()
     
     alz.get_ge(entrez_id)
-    alz.generate_ns_vector(my_term)
+    alz.get_ns_act(myterm, thresh=0)
+    analysis_matrix = alz.make_ge_ns_mat(myterm, 740)
     
     # Run Science
     

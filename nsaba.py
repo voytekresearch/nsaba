@@ -79,12 +79,6 @@ class Nsaba(object):
         self.ge = {}
         self.term = {}
 
-        # Will integrate these into self.term
-        self.ns_coord_tree = None
-        self.ns_coord_act_df = None
-        self.ns_act_vector = None
-        self.aba_void_indices = None
-
     def get_aba_ge(self, entrez_ids):
 
         if self.__check_static_members() == 1:
@@ -164,15 +158,15 @@ class Nsaba(object):
         term_ids_act.rename(columns={'pmid':'id'}, inplace=True)
         return ns_coord_tree, term_coords.merge(term_ids_act)
 
-    def __sphere(self, xyz):
+    def __sphere(self, xyz, ns_coord_tree):
         """ Returns 3D Array containing coordinates in each layer of the sphere """
         sphere_bucket = []
         set_bucket = []
 
         # Needs work; generalize
         for i, r in enumerate(range(4, 0, -1)):
-            pts = self.ns_coord_tree.query_ball_point(xyz, r)
-            set_bucket.append(set(map(tuple, self.ns_coord_tree.data[pts])))
+            pts = ns_coord_tree.query_ball_point(xyz, r)
+            set_bucket.append(set(map(tuple, ns_coord_tree.data[pts])))
 
         for i in range(0,3):
             sphere_bucket.append(list(set_bucket[i].difference(set_bucket[i+1])))
@@ -181,13 +175,13 @@ class Nsaba(object):
 
         return [layer for layer in rev_iter]
 
-    def __get_act_values(self, bucket, weight, term):
+    def __get_act_values(self, bucket, weight, term, ns_coord_act_df):
         """ Returns weighted NS activation """
         bucket_act_vec = []
         for coords in bucket:
-            bucket_act_vec.append(self.ns_coord_act_df[(self.ns_coord_act_df['x'] == coords[0])
-                                 & (self.ns_coord_act_df['y'] == coords[1]) &
-                                 (self.ns_coord_act_df['z'] == coords[2])][term].mean())
+            bucket_act_vec.append(ns_coord_act_df[(ns_coord_act_df['x'] == coords[0])
+                                 & (ns_coord_act_df['y'] == coords[1]) &
+                                 (ns_coord_act_df['z'] == coords[2])][term].mean())
 
         return np.mean(bucket_act_vec)*weight
 
@@ -199,16 +193,18 @@ class Nsaba(object):
             print "'%s' is not a registered term."
             return 1
 
-        self.aba_void_indices = []
-        self.ns_act_vector = []
-        self.ns_coord_tree, self.ns_coord_act_df = self.__term_to_coords(term, thresh)
+        self.term[term] = {}
+        self.term[term]['ns_act_vector'] = []
+        self.term[term]['aba_void_indices'] = []
+
+        ns_coord_tree, ns_coord_act_df = self.__term_to_coords(term, thresh)
 
         for irow, xyz in enumerate(self.aba['mni_coords']):
-            sphere_bucket = self.__sphere(xyz)
+            sphere_bucket = self.__sphere(xyz, ns_coord_tree)
             sphere_vals = [0, 0]
             for w, bucket in enumerate(sphere_bucket):
-                weight = 1./(w+1)
-                bucket_mean = self.__get_act_values(bucket, weight, term)
+                weight = 1./(w+1)**2
+                bucket_mean = self.__get_act_values(bucket, weight, term, ns_coord_act_df)
                 if np.isnan(bucket_mean):
                     sphere_vals[0] += 0
                     sphere_vals[1] += 0
@@ -216,20 +212,19 @@ class Nsaba(object):
                     sphere_vals[0] += bucket_mean
                     sphere_vals[1] += weight
             if sphere_vals[1] == 0:
-                self.aba_void_indices.append(irow)
+                self.term[term]['aba_void_indices'].append(irow)
             else:
                 act_coeff = sphere_vals[0]/sphere_vals[1]
-                self.ns_act_vector.append(act_coeff)
+                self.term[term]['ns_act_vector'].append(act_coeff)
 
-
-    def make_ge_ns_mat(self, ns_term, entrez):
+    def make_ge_ns_mat(self, ns_term, entrez_id):
         if self.__check_static_members() == 1:
             return 1
 
-        # Once dictionary is made, term[ns_term].ns_act_vector
-        aba_indices = np.array([i for i in range(len(self.aba['mni_coords'])) if i not in self.aba_void_indices])
-        ge = self.ge[entrez][aba_indices]
-        return np.vstack((ge, self.ns_act_vector)).T
+        aba_indices = np.array([i for i in range(len(self.aba['mni_coords']))
+                                if i not in self.term[ns_term]['aba_void_indices']])
+        ge = self.ge[entrez_id][aba_indices]
+        return np.vstack((ge, self.term[ns_term]['ns_act_vector'])).T
 
     def __check_static_members(self):
         for val in self.aba.itervalues():
