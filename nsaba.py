@@ -9,7 +9,6 @@ import numpy as np
 import pandas as pd
 import os
 import itertools
-
 from scipy import spatial
 
 
@@ -37,7 +36,7 @@ class Nsaba(object):
                 'Probes.csv']
 
         if len(csv_names) != 3:
-            raise IndexError, "'csv_names' must a list of 3 'str' variables"
+            raise IndexError("'csv_names' must a list of 3 'str' variables")
 
         print 'This may take a minute or two ...'
 
@@ -78,6 +77,7 @@ class Nsaba(object):
 
         self.ge = {}
         self.term = {}
+        self.__ns_weight_f = lambda r: 1./r**2
 
     def get_aba_ge(self, entrez_ids):
 
@@ -203,7 +203,7 @@ class Nsaba(object):
             sphere_bucket = self.__sphere(xyz, ns_coord_tree)
             sphere_vals = [0, 0]
             for w, bucket in enumerate(sphere_bucket):
-                weight = 1./(w+1)**2
+                weight = self.__ns_weight_f(w+1)
                 bucket_mean = self.__get_act_values(bucket, weight, term, ns_coord_act_df)
                 if np.isnan(bucket_mean):
                     sphere_vals[0] += 0
@@ -225,6 +225,13 @@ class Nsaba(object):
                                 if i not in self.term[ns_term]['aba_void_indices']])
         ge = self.ge[entrez_id][aba_indices]
         return np.vstack((ge, self.term[ns_term]['ns_act_vector'])).T
+
+    def set_ns_weight_f(self, f):
+        try:
+            print "Test: f(e) = %.2f" % f(np.e)
+            self.__ns_weight_f = f
+        except TypeError:
+            print "'f' is improper, ensure 'f' receives only one parameter and returns a numeric type"
 
     def __check_static_members(self):
         for val in self.aba.itervalues():
