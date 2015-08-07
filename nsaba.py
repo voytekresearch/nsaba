@@ -185,12 +185,13 @@ class Nsaba(object):
 
         return np.mean(bucket_act_vec)*weight
 
+    #@profile
     def get_ns_act(self, term, thresh=0):
         """ Generates NS activation vector about ABA MNI coordinates  """
         if self.__check_static_members() == 1:
             return 1
         if not self.is_term(term):
-            print "'%s' is not a registered term."
+            print "'%s' is not a registered term." % term
             return 1
 
         self.term[term] = {}
@@ -221,10 +222,13 @@ class Nsaba(object):
         if self.__check_static_members() == 1:
             return 1
 
-        aba_indices = np.array([i for i in range(len(self.aba['mni_coords']))
-                                if i not in self.term[ns_term]['aba_void_indices']])
-        ge = self.ge[entrez_id][aba_indices]
-        return np.vstack((ge, self.term[ns_term]['ns_act_vector'])).T
+        if ns_term in self.term and entrez_id in self.ge:
+            aba_indices = np.array([i for i in range(len(self.aba['mni_coords']))
+                                    if i not in self.term[ns_term]['aba_void_indices']])
+            ge = self.ge[entrez_id][aba_indices]
+            return np.vstack((ge, self.term[ns_term]['ns_act_vector'])).T
+        else:
+            print "Either term['%s'] or ge[%s] does not exist; please check arguments" % (ns_term, entrez_id)
 
     def set_ns_weight_f(self, f):
         try:

@@ -13,14 +13,13 @@ if __name__ == '__main__':
 
     # Simon Path IO
     data_dir = 'C:\Users\\John\\Documents\\Code\\Python\\nsaba\\data_dir'
-    os.chdir(data_dir)
-    Nsaba.aba_load()
-    Nsaba.ns_load()
+    Nsaba.aba_load(data_dir)
+    Nsaba.ns_load(data_dir)
 
     A = Nsaba()
     A.get_aba_ge([733, 33, 88])
     A.ge.keys()
 
-    A.get_ns_act('attention')
+    A.get_ns_act('oscillations', -1)
 
-    print A.make_ge_ns_mat('', 733)
+    print A.make_ge_ns_mat('oscillations', 733)
