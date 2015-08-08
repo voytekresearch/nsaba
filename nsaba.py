@@ -13,7 +13,6 @@ from scipy import spatial
 
 
 class Nsaba(object):
-
     aba = {
         'exp_df': None,
         'probe_df': None,
@@ -59,7 +58,6 @@ class Nsaba(object):
         cls.aba['mni_coords'] = cls.aba['si_df'].loc[:, 'mni_x':'mni_z'].as_matrix().astype(float)
         print "Nsaba.aba['mni_coords'] initialized."
 
-
     @classmethod
     def ns_load(cls, ns_path=".", ns_files=None):
         """Initialization of 'ns' dictionary"""
@@ -77,7 +75,7 @@ class Nsaba(object):
 
         self.ge = {}
         self.term = {}
-        self.__ns_weight_f = lambda r: 1./r**2
+        self.__ns_weight_f = lambda r: 1. / r ** 2
 
     def get_aba_ge(self, entrez_ids):
 
@@ -105,7 +103,7 @@ class Nsaba(object):
             ge_df = self.aba['exp_df'].loc[self.aba['exp_df']['probe_id'].isin(probe_ids)]
             ge_mat = ge_df.as_matrix().astype(float)[:, 1:].T
 
-            #self.ge[entrez_id] = []
+            # self.ge[entrez_id] = []
 
             self.ge[entrez_id] = np.mean(ge_mat, axis=1)
 
@@ -116,7 +114,6 @@ class Nsaba(object):
             # self.ge[entrez_id].append(np.amax(diff_arr))
             # self.ge[entrez_id].append(len(ge_mat[0]))
             # self.ge[entrez_id] = np.squeeze(self.ge[entrez_id])
-
 
     # NeuroSynth book-keeping methods
 
@@ -149,63 +146,72 @@ class Nsaba(object):
     def __term_to_coords(self, term, thresh=0):
         """ Finds coordinates associated with a given term.
         Returns NS coordinate tree and ID/coordinate/activation DataFrame"""
-
         term_ids_act = self.ns['features_df'].loc[self.ns['features_df'][term] > thresh, ['pmid', term]]
         term_ids = term_ids_act['pmid'].tolist()
         term_coords = self.ns['database_df'].loc[self.ns['database_df']['id'].isin(term_ids)]
-        ns_coord_tree = spatial.KDTree(term_coords.loc[:, 'x':'z'].as_matrix().astype(float))
+        try:
+            ns_coord_tree = spatial.KDTree(term_coords.loc[:, 'x':'z'].as_matrix().astype(float))
+        except ValueError:
+            print "No studies with term: '%s' and threshold: %.2f found" % (term, thresh)
+            return 1, 1
+        else:
+            term_ids_act.rename(columns={'pmid': 'id'}, inplace=True)
+            return ns_coord_tree, term_coords.merge(term_ids_act)
 
-        term_ids_act.rename(columns={'pmid':'id'}, inplace=True)
-        return ns_coord_tree, term_coords.merge(term_ids_act)
-
-    def __sphere(self, xyz, ns_coord_tree):
+    def __sphere(self, xyz, ns_coord_tree, max_rad=4):
         """ Returns 3D Array containing coordinates in each layer of the sphere """
         sphere_bucket = []
         set_bucket = []
 
         # Needs work; generalize
-        for i, r in enumerate(range(4, 0, -1)):
+        for i, r in enumerate(range(max_rad, 0, -1)):
             pts = ns_coord_tree.query_ball_point(xyz, r)
             set_bucket.append(set(map(tuple, ns_coord_tree.data[pts])))
 
-        for i in range(0,3):
-            sphere_bucket.append(list(set_bucket[i].difference(set_bucket[i+1])))
+        for i in range(0, 3):
+            sphere_bucket.append(list(set_bucket[i].difference(set_bucket[i + 1])))
         sphere_bucket.append(list(set_bucket[3]))
         rev_iter = reversed(sphere_bucket)
 
         return [layer for layer in rev_iter]
 
+    def __knn_search(self, xyz, ns_coord_tree, max_rad=5, k=20):
+        """ KNN search of NS coordinates about ABA coordinates """
+        r, inds = ns_coord_tree.query(xyz, k)
+        return ns_coord_tree.data[inds[r < max_rad]], r[r < max_rad]
+
     def __get_act_values(self, bucket, weight, term, ns_coord_act_df):
         """ Returns weighted NS activation """
         bucket_act_vec = []
         for coords in bucket:
-            bucket_act_vec.append(ns_coord_act_df[(ns_coord_act_df['x'] == coords[0])
-                                 & (ns_coord_act_df['y'] == coords[1]) &
-                                 (ns_coord_act_df['z'] == coords[2])][term].mean())
+            coord = ns_coord_act_df[(ns_coord_act_df['x'] == coords[0])
+                                    & (ns_coord_act_df['y'] == coords[1])
+                                    & (ns_coord_act_df['z'] == coords[2])][term]
+            bucket_act_vec.append(coord.mean())
 
-        return np.mean(bucket_act_vec)*weight
+        return np.array(bucket_act_vec)*weight
 
-    #@profile
-    def get_ns_act(self, term, thresh=0):
-        """ Generates NS activation vector about ABA MNI coordinates  """
-        if self.__check_static_members() == 1:
-            return 1
-        if not self.is_term(term):
-            print "'%s' is not a registered term." % term
-            return 1
 
-        self.term[term] = {}
-        self.term[term]['ns_act_vector'] = []
-        self.term[term]['aba_void_indices'] = []
+    def __knn_method(self, term, ns_coord_act_df, ns_coord_tree):
+        """ KNN method """
+        for irow, xyz in enumerate(self.aba['mni_coords']):
+            coords, radii = self.__knn_search(xyz, ns_coord_tree)
+            weight = self.__ns_weight_f(radii)
+            weighted_means = self.__get_act_values(coords, weight, term, ns_coord_act_df)
+            if len(weighted_means) == 0:
+                self.term[term]['aba_void_indices'].append(irow)
+            else:
+                act_coeff = np.sum(weighted_means) / np.sum(weight)
+                self.term[term]['ns_act_vector'].append(act_coeff)
 
-        ns_coord_tree, ns_coord_act_df = self.__term_to_coords(term, thresh)
-
+    def __sphere_method(self, term, ns_coord_act_df, ns_coord_tree):
+        """ Sphere buckets method"""
         for irow, xyz in enumerate(self.aba['mni_coords']):
             sphere_bucket = self.__sphere(xyz, ns_coord_tree)
             sphere_vals = [0, 0]
             for w, bucket in enumerate(sphere_bucket):
-                weight = self.__ns_weight_f(w+1)
-                bucket_mean = self.__get_act_values(bucket, weight, term, ns_coord_act_df)
+                weight = self.__ns_weight_f(w + 1)
+                bucket_mean = np.mean(self.__get_act_values(bucket, weight, term, ns_coord_act_df))
                 if np.isnan(bucket_mean):
                     sphere_vals[0] += 0
                     sphere_vals[1] += 0
@@ -215,8 +221,32 @@ class Nsaba(object):
             if sphere_vals[1] == 0:
                 self.term[term]['aba_void_indices'].append(irow)
             else:
-                act_coeff = sphere_vals[0]/sphere_vals[1]
+                act_coeff = sphere_vals[0] / sphere_vals[1]
                 self.term[term]['ns_act_vector'].append(act_coeff)
+
+    # @profile
+    def get_ns_act(self, term, thresh=0, method='knn'):
+        """ Generates NS activation vector about ABA MNI coordinates  """
+        if self.__check_static_members() == 1:
+            return 1
+        if not self.is_term(term):
+            print "'%s' is not a registered term." % term
+            return 1
+
+        ns_coord_tree, ns_coord_act_df = self.__term_to_coords(term, thresh)
+        if type(ns_coord_tree) == int:
+            return 1
+
+        self.term[term] = {}
+        self.term[term]['ns_act_vector'] = []
+        self.term[term]['aba_void_indices'] = []
+
+        if method == 'knn':
+            self.__knn_method(term, ns_coord_act_df, ns_coord_tree)
+        elif method == 'sphere':
+            self.__sphere_method(term, ns_coord_act_df, ns_coord_tree)
+        else:
+            print "'%s' is not a valid parameter value for 'method' parameter, use either 'knn' or 'sphere" % method
 
     def make_ge_ns_mat(self, ns_term, entrez_id):
         if self.__check_static_members() == 1:

@@ -7,7 +7,6 @@ Created on Mon Jul 13 16:33:15 2015
 """
 
 from nsaba import Nsaba
-import os
 
 if __name__ == '__main__':
 
@@ -20,6 +19,8 @@ if __name__ == '__main__':
     A.get_aba_ge([733, 33, 88])
     A.ge.keys()
 
-    A.get_ns_act('oscillations', -1)
+    term = 'attention'
+    A.get_ns_act(term, thresh=.2)
+    A.get_ns_act(term, thresh=.2, method='sphere')
 
-    print A.make_ge_ns_mat('oscillations', 733)
+    print A.make_ge_ns_mat(term, 733)
