@@ -27,8 +27,8 @@ Save the decompressed output of this file to somewhere you will remember (/Users
     alz = Nsaba()
     
     alz.get_ge(entrez_id)
-    alz.get_ns_act(myterm, thresh=0)
-    analysis_matrix = alz.make_ge_ns_mat(myterm, [740,88])
+    alz.get_ns_act(myterm, thresh=0, method='knn', k=15)
+    analysis_matrix = alz.make_ge_ns_mat(myterm, entrez_ids)
     
     # Run Science
     
