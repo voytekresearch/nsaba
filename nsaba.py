@@ -77,11 +77,8 @@ class Nsaba(object):
         self.term = {}
         self.__ns_weight_f = lambda r: 1. / r ** 2
 
-    def get_aba_ge(self, entrez_ids):
-
-        if self.__check_static_members() == 1:
-            return 1
-
+    def check_entrez_struct(self, entrez_ids):
+        """ Checks if 'entrez_ids' parameter is an non-str iterable"""
         try:
             iter(entrez_ids)
         except TypeError:
@@ -91,6 +88,16 @@ class Nsaba(object):
             if isinstance(entrez_ids, str):
                 print "Invalid parameter form; please contain entrez ids as 'str' types in iterable container"
                 return 1
+            else:
+                return 0
+
+    def get_aba_ge(self, entrez_ids):
+        """ Retrieves an stores gene expression coefficients in ABA dictionary based on a
+        a passed list of Entrez IDs"""
+        if self.__check_static_members() == 1:
+            return 1
+        if self.check_entrez_struct(entrez_ids) == 1:
+            return 1
 
         for entrez_id in entrez_ids:
             probe_ids = self.aba['probe_df'].loc[self.aba['probe_df']['entrez_id']
@@ -102,20 +109,8 @@ class Nsaba(object):
 
             ge_df = self.aba['exp_df'].loc[self.aba['exp_df']['probe_id'].isin(probe_ids)]
             ge_mat = ge_df.as_matrix().astype(float)[:, 1:].T
-
-            # self.ge[entrez_id] = []
-
             self.ge[entrez_id] = np.mean(ge_mat, axis=1)
 
-            # Additional Metrics
-            # self.ge[entrez_id].append(np.mean(ge_mat, axis=1))
-            # diff_arr = [np.amax(row) - np.amin(row) for row in ge_mat]
-            # self.ge[entrez_id].append(diff_arr)
-            # self.ge[entrez_id].append(np.amax(diff_arr))
-            # self.ge[entrez_id].append(len(ge_mat[0]))
-            # self.ge[entrez_id] = np.squeeze(self.ge[entrez_id])
-
-    # NeuroSynth book-keeping methods
 
     def is_term(self, term):
         """ Checks if this term is in the neurosynth database """
@@ -252,17 +247,23 @@ class Nsaba(object):
             raise TypeError("'%s' is not a valid parameter value for 'method' parameter, use either 'knn' or 'sphere"
                             % method)
 
-    def make_ge_ns_mat(self, ns_term, entrez_id):
+    def make_ge_ns_mat(self, ns_term, entrez_ids):
         if self.__check_static_members() == 1:
             return 1
+        if self.check_entrez_struct(entrez_ids) == 1:
+            return 1
 
-        if ns_term in self.term and entrez_id in self.ge:
-            aba_indices = np.array([i for i in range(len(self.aba['mni_coords']))
-                                    if i not in self.term[ns_term]['aba_void_indices']])
-            ge = self.ge[entrez_id][aba_indices]
-            return np.vstack((ge, self.term[ns_term]['ns_act_vector'])).T
+        if ns_term in self.term and all([key in self.ge for key in entrez_ids]):
+            ge_ns_mat = []
+            for entrez_id in entrez_ids:
+                aba_indices = np.array([i for i in range(len(self.aba['mni_coords']))
+                                        if i not in self.term[ns_term]['aba_void_indices']])
+                ge_ns_mat.append(self.ge[entrez_id][aba_indices])
+            ge_ns_mat.append(self.term[ns_term]['ns_act_vector'])
+            return np.vstack(ge_ns_mat).T
         else:
-            print "Either term['%s'] or ge[%s] does not exist; please check arguments" % (ns_term, entrez_id)
+            print "Either term['%s'] or one or more Entrez ID keys does not exist; please check arguments" \
+                  % ns_term
 
     def set_ns_weight_f(self, f):
         try:
