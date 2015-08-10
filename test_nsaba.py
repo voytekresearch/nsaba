@@ -20,7 +20,7 @@ if __name__ == '__main__':
     A.ge.keys()
 
     term = 'attention'
-    A.get_ns_act(term, thresh=.2)
+    A.get_ns_act(term, thresh=.2, k=20, search_radii=3)
     A.get_ns_act(term, thresh=.2, method='sphere')
 
     print A.make_ge_ns_mat(term, 733)

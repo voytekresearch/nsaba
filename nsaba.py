@@ -158,7 +158,7 @@ class Nsaba(object):
             term_ids_act.rename(columns={'pmid': 'id'}, inplace=True)
             return ns_coord_tree, term_coords.merge(term_ids_act)
 
-    def __sphere(self, xyz, ns_coord_tree, max_rad=4):
+    def __sphere(self, xyz, ns_coord_tree, max_rad=5):
         """ Returns 3D Array containing coordinates in each layer of the sphere """
         sphere_bucket = []
         set_bucket = []
@@ -191,11 +191,10 @@ class Nsaba(object):
 
         return np.array(bucket_act_vec)*weight
 
-
-    def __knn_method(self, term, ns_coord_act_df, ns_coord_tree):
+    def __knn_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii, k):
         """ KNN method """
         for irow, xyz in enumerate(self.aba['mni_coords']):
-            coords, radii = self.__knn_search(xyz, ns_coord_tree)
+            coords, radii = self.__knn_search(xyz, ns_coord_tree, search_radii, k)
             weight = self.__ns_weight_f(radii)
             weighted_means = self.__get_act_values(coords, weight, term, ns_coord_act_df)
             if len(weighted_means) == 0:
@@ -204,10 +203,10 @@ class Nsaba(object):
                 act_coeff = np.sum(weighted_means) / np.sum(weight)
                 self.term[term]['ns_act_vector'].append(act_coeff)
 
-    def __sphere_method(self, term, ns_coord_act_df, ns_coord_tree):
+    def __sphere_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii):
         """ Sphere buckets method"""
         for irow, xyz in enumerate(self.aba['mni_coords']):
-            sphere_bucket = self.__sphere(xyz, ns_coord_tree)
+            sphere_bucket = self.__sphere(xyz, ns_coord_tree, search_radii)
             sphere_vals = [0, 0]
             for w, bucket in enumerate(sphere_bucket):
                 weight = self.__ns_weight_f(w + 1)
@@ -224,8 +223,8 @@ class Nsaba(object):
                 act_coeff = sphere_vals[0] / sphere_vals[1]
                 self.term[term]['ns_act_vector'].append(act_coeff)
 
-    # @profile
-    def get_ns_act(self, term, thresh=0, method='knn'):
+    #@profile
+    def get_ns_act(self, term, thresh=0, method='knn', search_radii=5, k=None):
         """ Generates NS activation vector about ABA MNI coordinates  """
         if self.__check_static_members() == 1:
             return 1
@@ -242,11 +241,16 @@ class Nsaba(object):
         self.term[term]['aba_void_indices'] = []
 
         if method == 'knn':
-            self.__knn_method(term, ns_coord_act_df, ns_coord_tree)
+            if k is None:
+                k = 20
+            self.__knn_method(term, ns_coord_act_df, ns_coord_tree, search_radii, k)
         elif method == 'sphere':
-            self.__sphere_method(term, ns_coord_act_df, ns_coord_tree)
+            if k is not None:
+                raise ValueError("'k' parameter cannot be used with 'sphere' method.")
+            self.__sphere_method(term, ns_coord_act_df, ns_coord_tree, search_radii)
         else:
-            print "'%s' is not a valid parameter value for 'method' parameter, use either 'knn' or 'sphere" % method
+            raise TypeError("'%s' is not a valid parameter value for 'method' parameter, use either 'knn' or 'sphere"
+                            % method)
 
     def make_ge_ns_mat(self, ns_term, entrez_id):
         if self.__check_static_members() == 1:
