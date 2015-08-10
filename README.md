@@ -28,7 +28,7 @@ Save the decompressed output of this file to somewhere you will remember (/Users
     
     alz.get_ge(entrez_id)
     alz.get_ns_act(myterm, thresh=0)
-    analysis_matrix = alz.make_ge_ns_mat(myterm, 740)
+    analysis_matrix = alz.make_ge_ns_mat(myterm, [740,88])
     
     # Run Science
     
