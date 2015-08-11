@@ -170,10 +170,10 @@ class Nsaba(object):
 
         return [layer for layer in rev_iter]
 
-    def __knn_search(self, xyz, ns_coord_tree, max_rad=5, k=20):
+    def __knn_search(self, xyz, coord_tree, max_rad=5, k=20):
         """ KNN search of NS coordinates about ABA coordinates """
-        r, inds = ns_coord_tree.query(xyz, k)
-        return ns_coord_tree.data[inds[r < max_rad]], r[r < max_rad]
+        r, inds = coord_tree.query(xyz, k)
+        return coord_tree.data[inds[r < max_rad]], r[r < max_rad]
 
     def __get_act_values(self, bucket, weight, term, ns_coord_act_df):
         """ Returns weighted NS activation """
