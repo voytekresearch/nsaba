@@ -7,6 +7,7 @@ Created on Mon Jul 13 16:33:15 2015
 """
 
 from nsaba import Nsaba
+import timeit
 
 if __name__ == '__main__':
 
@@ -19,7 +20,9 @@ if __name__ == '__main__':
     A.get_aba_ge([733, 33, 88])
     A.ge.keys()
 
-    A.coord_to_ge([10, 20, 30], [733, 33, 88], search_radii=20)
+    A.get_aba_ge_all()
+
+    #A.coord_to_ge([10, 20, 30], [733, 33, 88], search_radii=20)
 
     # term = 'attention'
     # A.get_ns_act(term, thresh=.2, k=20, search_radii=3)

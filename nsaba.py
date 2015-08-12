@@ -113,6 +113,26 @@ class Nsaba(object):
             ge_mat = ge_df.as_matrix().astype(float)[:, 1:].T
             self.ge[entrez_id] = np.mean(ge_mat, axis=1)
 
+    def get_aba_ge_all(self):
+        """ Returns a dictionary with ABA gene expression coefficient across all genes
+        at sampled locations"""
+
+        warning_flag = True
+        while warning_flag:
+            y_n = raw_input("WARNING: this operation can take upwards of an hour to undertake, proceed? (Y/n): ")
+            if y_n == 'Y':
+                warning_flag = False
+            elif y_n == 'n':
+                return 0
+            else:
+                print "Invalid response: %s" % y_n
+
+        entrez_ids = self.aba['probe_df']['entrez_id'][
+            self.aba['probe_df']['entrez_id'].notnull()].unique().astype(int)
+
+        self.get_aba_ge(entrez_ids)
+
+
     def is_term(self, term):
         """ Checks if this term is in the neurosynth database """
         if term in self.ns['features_df'].columns:
@@ -258,7 +278,7 @@ class Nsaba(object):
         if ns_term in self.term and all([key in self.ge for key in entrez_ids]):
             ge_ns_mat = []
             for entrez_id in entrez_ids:
-                aba_indices = np.array([i for i in range(len(self.aba['mni_coords']))
+                aba_indices = np.array([i for i in range(len(self.aba['mni_coords'].data))
                                         if i not in self.term[ns_term]['aba_void_indices']])
                 ge_ns_mat.append(self.ge[entrez_id][aba_indices])
             ge_ns_mat.append(self.term[ns_term]['ns_act_vector'])
