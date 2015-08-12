@@ -13,6 +13,7 @@ from scipy import spatial
 
 
 class Nsaba(object):
+
     aba = {
         'exp_df': None,
         'probe_df': None,
@@ -55,7 +56,8 @@ class Nsaba(object):
         cls.aba['probe_df'] = pd.read_csv(csv_path)
         print '%s loaded.' % csv_names[2]
 
-        cls.aba['mni_coords'] = cls.aba['si_df'].loc[:, 'mni_x':'mni_z'].as_matrix().astype(float)
+        mni_coords = cls.aba['si_df'].loc[:, 'mni_x':'mni_z'].as_matrix().astype(float)
+        cls.aba['mni_coords'] = spatial.KDTree(mni_coords)
         print "Nsaba.aba['mni_coords'] initialized."
 
     @classmethod
@@ -111,7 +113,6 @@ class Nsaba(object):
             ge_mat = ge_df.as_matrix().astype(float)[:, 1:].T
             self.ge[entrez_id] = np.mean(ge_mat, axis=1)
 
-
     def is_term(self, term):
         """ Checks if this term is in the neurosynth database """
         if term in self.ns['features_df'].columns:
@@ -126,13 +127,13 @@ class Nsaba(object):
         else:
             return False
 
-    def coord_to_ids(self, coord):
+    def __coord_to_ids(self, coord):
         """ Uses the study dictionary above to find study ids from x,y,z coordinates """
         # Use Later?
 
         return
 
-    def id_to_terms(self, ID):
+    def __id_to_terms(self, ID):
         """ Finds all of the term heat values of a given ID """
         # Use Later?
 
@@ -153,15 +154,15 @@ class Nsaba(object):
             term_ids_act.rename(columns={'pmid': 'id'}, inplace=True)
             return ns_coord_tree, term_coords.merge(term_ids_act)
 
-    def __sphere(self, xyz, ns_coord_tree, max_rad=5):
+    def __sphere(self, xyz, coord_tree, max_rad=5):
         """ Returns 3D Array containing coordinates in each layer of the sphere """
         sphere_bucket = []
         set_bucket = []
 
         # Needs work; generalize
         for i, r in enumerate(range(max_rad, 0, -1)):
-            pts = ns_coord_tree.query_ball_point(xyz, r)
-            set_bucket.append(set(map(tuple, ns_coord_tree.data[pts])))
+            pts = coord_tree.query_ball_point(xyz, r)
+            set_bucket.append(set(map(tuple, coord_tree.data[pts])))
 
         for i in range(0, 3):
             sphere_bucket.append(list(set_bucket[i].difference(set_bucket[i + 1])))
@@ -173,7 +174,7 @@ class Nsaba(object):
     def __knn_search(self, xyz, coord_tree, max_rad=5, k=20):
         """ KNN search of NS coordinates about ABA coordinates """
         r, inds = coord_tree.query(xyz, k)
-        return coord_tree.data[inds[r < max_rad]], r[r < max_rad]
+        return inds[r < max_rad], r[r < max_rad]
 
     def __get_act_values(self, bucket, weight, term, ns_coord_act_df):
         """ Returns weighted NS activation """
@@ -188,8 +189,9 @@ class Nsaba(object):
 
     def __knn_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii, k):
         """ KNN method """
-        for irow, xyz in enumerate(self.aba['mni_coords']):
-            coords, radii = self.__knn_search(xyz, ns_coord_tree, search_radii, k)
+        for irow, xyz in enumerate(self.aba['mni_coords'].data):
+            coord_inds, radii = self.__knn_search(xyz, ns_coord_tree, search_radii, k)
+            coords = ns_coord_tree.data[coord_inds]
             weight = self.__ns_weight_f(radii)
             weighted_means = self.__get_act_values(coords, weight, term, ns_coord_act_df)
             if len(weighted_means) == 0:
@@ -200,7 +202,7 @@ class Nsaba(object):
 
     def __sphere_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii):
         """ Sphere buckets method"""
-        for irow, xyz in enumerate(self.aba['mni_coords']):
+        for irow, xyz in enumerate(self.aba['mni_coords'].data):
             sphere_bucket = self.__sphere(xyz, ns_coord_tree, search_radii)
             sphere_vals = [0, 0]
             for w, bucket in enumerate(sphere_bucket):
@@ -264,6 +266,27 @@ class Nsaba(object):
         else:
             print "Either term['%s'] or one or more Entrez ID keys does not exist; please check arguments" \
                   % ns_term
+
+    def coord_to_ge(self, coord, entrez_ids, search_radii=10, k=20):
+        """ Returns weighted ABA gene expression mean about some MNI coordinate based
+        on a list of passed Entrez IDs"""
+        if self.__check_static_members() == 1:
+            return 1
+        if self.check_entrez_struct(entrez_ids) == 1:
+            return 1
+
+        ge_for_coord = []
+        for entrez_id in entrez_ids:
+            coord_inds, radii = self.__knn_search(coord, self.aba['mni_coords'], search_radii, k)
+            if len(coord_inds) == 0:
+                print "No ABA coordinates are within search radius of specified coordinate"
+                break
+            weight = self.__ns_weight_f(radii)
+            local_ge = self.ge[entrez_id][coord_inds]
+            weighted_ge_mean = np.sum(local_ge*weight)/np.sum(weight)
+            ge_for_coord.append(weighted_ge_mean)
+
+        return ge_for_coord
 
     def set_ns_weight_f(self, f):
         try:

@@ -19,8 +19,9 @@ if __name__ == '__main__':
     A.get_aba_ge([733, 33, 88])
     A.ge.keys()
 
-    term = 'attention'
-    A.get_ns_act(term, thresh=.2, k=20, search_radii=3)
-    # A.get_ns_act(term, thresh=.2, method='sphere')
+    A.coord_to_ge([10, 20, 30], [733, 33, 88], search_radii=20)
 
-    print A.make_ge_ns_mat(term, [733, 33, 88])
+    # term = 'attention'
+    # A.get_ns_act(term, thresh=.2, k=20, search_radii=3)
+    # A.get_ns_act(term, thresh=.2, method='sphere')
+    # print A.make_ge_ns_mat(term, [733, 33, 88])
