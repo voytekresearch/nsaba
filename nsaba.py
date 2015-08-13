@@ -119,7 +119,7 @@ class Nsaba(object):
 
         warning_flag = True
         while warning_flag:
-            y_n = raw_input("WARNING: this operation can take upwards of an hour to undertake, proceed? (Y/n): ")
+            y_n = raw_input("WARNING: this operation can take upwards of an hour, proceed? (Y/n): ")
             if y_n == 'Y':
                 warning_flag = False
             elif y_n == 'n':
