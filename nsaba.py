@@ -73,6 +73,23 @@ class Nsaba(object):
         cls.ns['features_df'] = pd.read_table(os.path.join(ns_path, ns_files[1]))
         print "%s loaded." % ns_files[1]
 
+        cls.ns['terms'] = cls.ns['features_df'].columns
+        # for easy access and point to to help users
+
+        mni_coords = cls.ns['database_df'].loc[:, 'x':'z'].as_matrix().astype(float)
+        cls.ns['mni_coords'] = spatial.KDTree(mni_coords)
+
+        cls.ns['id_dict'] = {}
+        c = 0
+
+        for i in cls.ns['database_df'].loc[:, 'id']:
+            if i not in cls.ns['id_dict']:
+                cls.ns['id_dict'][i] = [(np.floor(cls.ns['database_df']['x'].iloc[c]), np.floor(cls.ns['database_df']['y'].iloc[c]), np.floor(cls.ns['database_df']['z'].iloc[c]))]
+                c += 1
+            else:
+                cls.ns['id_dict'][i].append((np.floor(cls.ns['database_df']['x'].iloc[c]), np.floor(cls.ns['database_df']['y'].iloc[c]), np.floor(cls.ns['database_df']['z'].iloc[c])))
+        return 0
+
     def __init__(self):
 
         self.ge = {}
@@ -80,15 +97,15 @@ class Nsaba(object):
         self.__ns_weight_f = lambda r: 1. / r ** 2
 
     def check_entrez_struct(self, entrez_ids):
-        """ Checks if 'entrez_ids' parameter is an non-str iterable"""
+        """ Checks if 'entrez_ids' parameter is an int in an iterable"""
         try:
             iter(entrez_ids)
         except TypeError:
-            print "Invalid parameter form; please contain entrez ids as 'str' types in iterable container"
+            print "Invalid parameter form; please contain entrez ids as 'int' types in iterable container"
             return 1
         else:
             if isinstance(entrez_ids, str):
-                print "Invalid parameter form; please contain entrez ids as 'str' types in iterable container"
+                print "Invalid parameter form; please contain entrez ids as 'int' types in iterable container"
                 return 1
             else:
                 return 0
@@ -115,7 +132,7 @@ class Nsaba(object):
 
     def is_term(self, term):
         """ Checks if this term is in the neurosynth database """
-        if term in self.ns['features_df'].columns:
+        if term in self.ns['terms']:
             return True
         else:
             return False
@@ -127,17 +144,65 @@ class Nsaba(object):
         else:
             return False
 
-    def __coord_to_ids(self, coord):
+    def is_coord(self, coordinate):
+        """ Checks if an x,y,z coordinate in list form matches a NS data point"""
+        zipped_coordinates = np.squeeze(zip(self.ns['mni_coords'].data))
+        if coordinate in zipped_coordinates:
+            return True
+        else:
+            return False
+
+    def coord_to_ids(self, coord):
         """ Uses the study dictionary above to find study ids from x,y,z coordinates """
-        # Use Later?
+        ids = []
+        if self.is_coord(coord):
+            for i, coords in self.ns['id_dict'].items():
+                if coord in coords:
+                    ids.append(i)
+        else:
+            return 'Invalid Coordinates. Enter coordinates as a list: (x,y,z)'
+        return ids
 
-        return
-
-    def __id_to_terms(self, ID):
+    def id_to_terms(self, study_id):
         """ Finds all of the term heat values of a given ID """
-        # Use Later?
+        if self.is_id(study_id):
+            return np.squeeze(self.ns['features_df'].loc[self.ns['features_df']['pmid'] == study_id].as_matrix())
+        else:
+            return 'Invalid study id'
 
-        return
+    def build_ns_coord_study_matrix(self, save_location=''):
+        """ builds a 4d matrix of the term heats where we have NS studies """
+
+        matrix_size = 100
+        ns_big_matrix = np.zeros((matrix_size*2, matrix_size*2, matrix_size*2, 3407))
+
+        for x in xrange(matrix_size*2):
+            for y in xrange(matrix_size*2):
+                for z in xrange(matrix_size*2):
+                    if self.is_coord((x-matrix_size, y-matrix_size, z-matrix_size)):
+                        study_id = self.coord_to_ids((x-matrix_size, y-matrix_size, z-matrix_size))
+                        if len(study_id) == 1:
+                            # one study for this coordinate
+                            ns_big_matrix[x][y][z][:] = self.id_to_terms(study_id)
+                        else:
+                            # if there are multiple studies for this coordinate
+                            temp = []
+                            try:
+                                for multiple_study in study_id:
+                                    temp.append(self.id_to_terms(multiple_study))
+                                ns_big_matrix[x][y][z][:] = np.mean(temp, 0)
+                            except TypeError:
+                                print study_id
+                                print multiple_study
+            if np.mod(x, 2):
+                print str(x) + ' percent complete'
+
+        self.ns['ns_study_matrix'] = ns_big_matrix
+        if save_location:
+            np.save(save_location, ns_big_matrix)
+        else:
+            print 'You have the option to save this matrix by inputing a save location and filename'
+        return ns_big_matrix
 
     def __term_to_coords(self, term, thresh=0):
         """ Finds coordinates associated with a given term.
@@ -258,7 +323,7 @@ class Nsaba(object):
         if ns_term in self.term and all([key in self.ge for key in entrez_ids]):
             ge_ns_mat = []
             for entrez_id in entrez_ids:
-                aba_indices = np.array([i for i in range(len(self.aba['mni_coords']))
+                aba_indices = np.array([i for i in range(len(self.aba['mni_coords'].data))
                                         if i not in self.term[ns_term]['aba_void_indices']])
                 ge_ns_mat.append(self.ge[entrez_id][aba_indices])
             ge_ns_mat.append(self.term[ns_term]['ns_act_vector'])
