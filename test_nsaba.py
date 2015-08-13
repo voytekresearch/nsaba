@@ -7,7 +7,6 @@ Created on Mon Jul 13 16:33:15 2015
 """
 
 from nsaba import Nsaba
-import timeit
 
 if __name__ == '__main__':
 
@@ -16,15 +15,17 @@ if __name__ == '__main__':
     Nsaba.aba_load(data_dir)
     Nsaba.ns_load(data_dir)
 
+    # Getting gene expression for Entrez IDs: 733, 33, 88
     A = Nsaba()
     A.get_aba_ge([733, 33, 88])
     A.ge.keys()
 
     A.get_aba_ge_all()
 
-    #A.coord_to_ge([10, 20, 30], [733, 33, 88], search_radii=20)
+    # Coordinate to gene expression
+    A.coord_to_ge([10, 20, 30], [733, 33, 88], search_radii=20)
 
-    # term = 'attention'
-    # A.get_ns_act(term, thresh=.2, k=20, search_radii=3)
-    # A.get_ns_act(term, thresh=.2, method='sphere')
-    # print A.make_ge_ns_mat(term, [733, 33, 88])
+    # Getting NS activation vector for term 'attention'
+    term = 'attention'
+    A.get_ns_act(term, thresh=.2, k=20, search_radii=3)
+    print A.make_ge_ns_mat(term, [733, 33, 88])
