@@ -7,6 +7,7 @@ Last Updated: 7/26/2015
 """
 import numpy as np
 import pandas as pd
+import pickle
 import os
 import itertools
 from scipy import spatial
@@ -29,6 +30,7 @@ class Nsaba(object):
     @classmethod
     def aba_load(cls, aba_path=".", csv_names=None):
         """Initialization of 'aba' dictionary"""
+
         if not csv_names:
             csv_names = [
                 'MicroarrayExpression.csv',
@@ -63,6 +65,7 @@ class Nsaba(object):
     @classmethod
     def ns_load(cls, ns_path=".", ns_files=None):
         """Initialization of 'ns' dictionary"""
+
         if not ns_files:
             ns_files = ['database.txt', 'features.txt']
 
@@ -74,7 +77,6 @@ class Nsaba(object):
         print "%s loaded." % ns_files[1]
 
     def __init__(self):
-
         self.ge = {}
         self.term = {}
         self.__ns_weight_f = lambda r: 1. / r ** 2
@@ -96,6 +98,7 @@ class Nsaba(object):
     def get_aba_ge(self, entrez_ids):
         """ Retrieves an stores gene expression coefficients in ABA dictionary based on a
         a passed list of Entrez IDs"""
+
         if self.__check_static_members() == 1:
             return 1
         if self.check_entrez_struct(entrez_ids) == 1:
@@ -113,36 +116,32 @@ class Nsaba(object):
             ge_mat = ge_df.as_matrix().astype(float)[:, 1:].T
             self.ge[entrez_id] = np.mean(ge_mat, axis=1)
 
-    def get_aba_ge_all(self):
-        """ Returns a dictionary with ABA gene expression coefficient across all genes
-        at sampled locations"""
+    def pickle_ge(self, pkl_file="Nsaba_ABA_ge.pkl", output_dir='.'):
+        if self.__check_static_members() == 1:
+            return 1
+        pickle.dump(self.ge, open(os.path.join(output_dir, pkl_file), 'wb'))
+        print "%s successfully created" % pkl_file
 
-        warning_flag = True
-        while warning_flag:
-            y_n = raw_input("WARNING: this operation can take upwards of an hour, proceed? (Y/n): ")
-            if y_n == 'Y':
-                warning_flag = False
-            elif y_n == 'n':
-                return 0
-            else:
-                print "Invalid response: %s" % y_n
+    def load_ge_pickle(self, file_path="ABA_ge.pkl"):
+        self.ge = pickle.load(open(file_path, 'wb'))
+        print "'ge' dictionary successfully loaded"
 
-        entrez_ids = self.aba['probe_df']['entrez_id'][
-            self.aba['probe_df']['entrez_id'].notnull()].unique().astype(int)
-
-        self.get_aba_ge(entrez_ids)
-
-
-    def is_term(self, term):
+    @classmethod
+    def is_term(cls, term):
         """ Checks if this term is in the neurosynth database """
-        if term in self.ns['features_df'].columns:
+        if cls.__check_static_members() == 1:
+            return 1
+        if term in cls.ns['features_df'].columns:
             return True
         else:
             return False
 
-    def is_id(self, ID):
+    @classmethod
+    def is_id(cls, ID):
+        if cls.__check_static_members() == 1:
+            return 1
         """ Checks if ID is registered """
-        if (self.ns['features_df']['pmid'] == ID).any():
+        if (cls.ns['features_df']['pmid'] == ID).any():
             return True
         else:
             return False
@@ -240,7 +239,6 @@ class Nsaba(object):
                 act_coeff = sphere_vals[0] / sphere_vals[1]
                 self.term[term]['ns_act_vector'].append(act_coeff)
 
-    #@profile
     def get_ns_act(self, term, thresh=0, method='knn', search_radii=5, k=None):
         """ Generates NS activation vector about ABA MNI coordinates  """
         if self.__check_static_members() == 1:
