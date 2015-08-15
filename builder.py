@@ -1,3 +1,13 @@
+# -*- coding: utf-8 -*-
+"""
+builder.py:
+Contains NsabaBuilder class designed single use,
+heavy duty Nsaba operations such as creating a GE
+matrix for all registered Entrez IDs.
+
+Author: Simon Haxby
+"""
+
 from nsaba import Nsaba
 import numpy as np
 

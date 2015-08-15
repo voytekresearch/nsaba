@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Neurosynth & Allen Brain Atlas: nsaba
-Authors: Simon Haxby, Scott Susi, Torben Noto
+nsaba.py: (N)euro(s)ynth, (A)llen (B)rain (A)tlas
+Methods to analyze genome-scale gene expression data
+from the Allen Human Brain Atlas in conjunction with
+fMRI activation maps from Neurosynth
 
-Last Updated: 7/26/2015
+Authors: Simon Haxby, Scott Susi, Torben Noto
 """
 import numpy as np
 import pandas as pd
