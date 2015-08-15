@@ -123,25 +123,23 @@ class Nsaba(object):
         print "%s successfully created" % pkl_file
 
     def load_ge_pickle(self, file_path="ABA_ge.pkl"):
-        self.ge = pickle.load(open(file_path, 'wb'))
+        self.ge = pickle.load(open(file_path, 'rb'))
         print "'ge' dictionary successfully loaded"
 
-    @classmethod
-    def is_term(cls, term):
+    def is_term(self, term):
         """ Checks if this term is in the neurosynth database """
-        if cls.__check_static_members() == 1:
+        if self.__check_static_members() == 1:
             return 1
-        if term in cls.ns['features_df'].columns:
+        if term in self.ns['features_df'].columns:
             return True
         else:
             return False
 
-    @classmethod
-    def is_id(cls, ID):
-        if cls.__check_static_members() == 1:
+    def is_id(self, ID):
+        if self.__check_static_members() == 1:
             return 1
         """ Checks if ID is registered """
-        if (cls.ns['features_df']['pmid'] == ID).any():
+        if (self.ns['features_df']['pmid'] == ID).any():
             return True
         else:
             return False
