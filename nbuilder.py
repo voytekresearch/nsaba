@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-builder.py:
+nbuilder.py:
 Contains NsabaBuilder class designed single use,
 heavy duty Nsaba operations such as creating a GE
 matrix for all registered Entrez IDs.
