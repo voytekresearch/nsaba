@@ -1,6 +1,7 @@
 from nsaba import Nsaba
 import numpy as np
 
+
 class NsabaBuilder(Nsaba):
     """ Nsaba heavy duty building tasks"""
     def __init__(self):

@@ -1,2 +1,2 @@
-from nsaba import *
+from nsaba import Nsaba
 from builder import NsabaBuilder
