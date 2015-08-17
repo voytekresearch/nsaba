@@ -130,6 +130,25 @@ class Nsaba(object):
             ge_mat = ge_df.as_matrix().astype(float)[:, 1:].T
             self.ge[entrez_id] = np.mean(ge_mat, axis=1)
 
+    def get_aba_ge_all(self):
+        """ Returns a dictionary with ABA gene expression coefficient across all genes
+        at sampled locations"""
+
+        warning_flag = True
+        while warning_flag:
+            y_n = raw_input("WARNING: this operation can take upwards of an hour, proceed? (Y/n): ")
+            if y_n == 'Y':
+                warning_flag = False
+            elif y_n == 'n':
+                return 0
+            else:
+                print "Invalid response: %s" % y_n
+
+        entrez_ids = self.aba['probe_df']['entrez_id'][
+            self.aba['probe_df']['entrez_id'].notnull()].unique().astype(int)
+
+        self.get_aba_ge(entrez_ids)
+
     def is_term(self, term):
         """ Checks if this term is in the neurosynth database """
         if term in self.ns['terms']:
@@ -137,63 +156,74 @@ class Nsaba(object):
         else:
             return False
 
-    def is_id(self, ID):
+    def is_id(self, study_id):
         """ Checks if ID is registered """
-        if (self.ns['features_df']['pmid'] == ID).any():
-            return True
+        if len(self.ns['features_df']['pmid'] == study_id) > 0:
+            if len(self.ns['database_df']['id'] == study_id) > 0:  # added layer because motherfuckers are missing data
+                return True
         else:
             return False
 
     def is_coord(self, coordinate):
         """ Checks if an x,y,z coordinate in list form matches a NS data point"""
         zipped_coordinates = np.squeeze(zip(self.ns['mni_coords'].data))
-        if coordinate in zipped_coordinates:
-            return True
-        else:
-            return False
+        for this_coordinate in zipped_coordinates:
+            if this_coordinate[0] == coordinate[0]:
+                if this_coordinate[1] == coordinate[1]:
+                    if this_coordinate[2] == coordinate[2]:
+                        return True
+        return False
 
-    def coord_to_ids(self, coord):
+    def coord_to_ids(self, coordinate):
         """ Uses the study dictionary above to find study ids from x,y,z coordinates """
         ids = []
-        if self.is_coord(coord):
-            for i, coords in self.ns['id_dict'].items():
-                if coord in coords:
-                    ids.append(i)
-        else:
-            return 'Invalid Coordinates. Enter coordinates as a list: (x,y,z)'
+        for i, coords in self.ns['id_dict'].items():
+            for this_coordinate in coords:
+                if this_coordinate[0] == coordinate[0]:
+                    if this_coordinate[1] == coordinate[1]:
+                        if this_coordinate[2] == coordinate[2]:
+                            if i not in ids:
+                                if self.is_id(i):
+                                    ids.append(i)
         return ids
 
-    def id_to_terms(self, study_id):
+    def __id_to_terms(self, study_id):
         """ Finds all of the term heat values of a given ID """
         if self.is_id(study_id):
-            return np.squeeze(self.ns['features_df'].loc[self.ns['features_df']['pmid'] == study_id].as_matrix())
+            term_vector_off_by_1 = np.squeeze(self.ns['features_df'].loc[self.ns['features_df']['pmid'] == study_id].as_matrix())
+            # shifting to remove id index from vector
+            return term_vector_off_by_1[1:]
         else:
             return 'Invalid study id'
+
+    def coord_to_terms(self, coord):
+        ids = self.coord_to_ids(coord)
+        if len(ids) == 1:
+            # one study
+            terms = self.__id_to_terms(ids)
+        elif len(ids) > 1:
+            # multiple studies
+            temp = []
+            for multiple_id in ids:
+                temp.append(self.__id_to_terms(multiple_id))
+                terms = np.mean(temp, 0)
+        else:
+            #print 'No terms found for id' + str(ids) + 'using coordinates:' + str(coord)
+            terms = []
+        return terms
+
 
     def build_ns_coord_study_matrix(self, save_location=''):
         """ builds a 4d matrix of the term heats where we have NS studies """
 
         matrix_size = 100
-        ns_big_matrix = np.zeros((matrix_size*2, matrix_size*2, matrix_size*2, 3407))
+        ns_big_matrix = np.zeros((matrix_size*2, matrix_size*2, matrix_size*2, 3406))
 
         for x in xrange(matrix_size*2):
             for y in xrange(matrix_size*2):
                 for z in xrange(matrix_size*2):
                     if self.is_coord((x-matrix_size, y-matrix_size, z-matrix_size)):
-                        study_id = self.coord_to_ids((x-matrix_size, y-matrix_size, z-matrix_size))
-                        if len(study_id) == 1:
-                            # one study for this coordinate
-                            ns_big_matrix[x][y][z][:] = self.id_to_terms(study_id)
-                        else:
-                            # if there are multiple studies for this coordinate
-                            temp = []
-                            try:
-                                for multiple_study in study_id:
-                                    temp.append(self.id_to_terms(multiple_study))
-                                ns_big_matrix[x][y][z][:] = np.mean(temp, 0)
-                            except TypeError:
-                                print study_id
-                                print multiple_study
+                        ns_big_matrix[x][y][z][:] = self.coord_to_terms((x-matrix_size, y-matrix_size, z-matrix_size))
             if np.mod(x, 2):
                 print str(x) + ' percent complete'
 
@@ -359,6 +389,62 @@ class Nsaba(object):
             self.__ns_weight_f = f
         except TypeError:
             print "'f' is improper, ensure 'f' receives only one parameter and returns a numeric type"
+
+    def visualize_ge(self, gene):
+        for e in gene:
+            if e in self.ge:
+                import matplotlib.pyplot as plt
+                import matplotlib.cm as cm
+                from mpl_toolkits.mplot3d import Axes3D
+                fig = plt.figure()
+                ax = fig.add_subplot(111, projection='3d')
+                weights = self.ge[e]
+                colors = cm.jet(weights/max(weights))
+                color_map = cm.ScalarMappable(cmap=cm.jet)
+                color_map.set_array(weights)
+                fig.colorbar(color_map)
+
+                x = self.aba['mni_coords'].data[:, 0]
+                y = self.aba['mni_coords'].data[:, 1]
+                z = self.aba['mni_coords'].data[:, 2]
+
+                ax.scatter(x, y, z, c=colors, alpha=0.4)
+            else:
+                print 'Gene '+str(e) + ' has not been initialized. Use self.get_aba_ge([' + str(e) + '])'
+        ax.set_title('Gene Expression of gene ID ' + str(entrez))
+
+        return fig
+
+    def visualize_ns(self, term, points=200):
+        if term in self.term:
+            term_index = self.ns['features_df'].columns.get_loc(term)
+            import matplotlib.pyplot as plt
+            import matplotlib.cm as cm
+            from mpl_toolkits.mplot3d import Axes3D
+            rand_point_inds = np.random.random_integers(0, len(np.squeeze(zip(self.ns['mni_coords'].data))), points)
+            rand_points = np.squeeze(zip(self.ns['mni_coords'].data))[rand_point_inds]
+            weights = []
+            inds_of_real_points_with_no_fucking_missing_study_ids = []
+            for rand_point in range(len(rand_points)):
+                if len(self.coord_to_terms(rand_points[rand_point].astype(list))) > 0:
+                    inds_of_real_points_with_no_fucking_missing_study_ids.append(rand_point_inds[rand_point])
+                    weights.append(self.coord_to_terms(rand_points[rand_point].astype(list))[term_index])
+            fig = plt.figure()
+            ax = fig.add_subplot(111, projection='3d')
+            colors = cm.jet(weights/max(weights))
+            color_map = cm.ScalarMappable(cmap=cm.jet)
+            color_map.set_array(weights)
+            fig.colorbar(color_map)
+            x = self.ns['mni_coords'].data[inds_of_real_points_with_no_fucking_missing_study_ids, 0]
+            y = self.ns['mni_coords'].data[inds_of_real_points_with_no_fucking_missing_study_ids, 1]
+            z = self.ns['mni_coords'].data[inds_of_real_points_with_no_fucking_missing_study_ids, 2]
+
+        else:
+            print 'Term '+term + ' has not been initialized. Use self.get_ns_act(' + term + ',thresh = 0.01)'
+        ax.scatter(x, y, z, c=colors, alpha=0.4)
+        ax.set_title('Estimation of ' + term)
+
+        return fig
 
     def __check_static_members(self):
         for val in self.aba.itervalues():
