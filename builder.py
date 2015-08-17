@@ -32,7 +32,14 @@ class NsabaBuilder(Nsaba):
 
         self.get_aba_ge(entrez_ids)
 
-    def build_sparse_ge_mat(self, mni_grid_size=(200,200,200)):
+    def build_sparse_ge_mat(self, mni_grid_size=(200, 200, 200)):
         """ Builds sparse 3D MNI numpy grid, and assigns a gene expression pointer to that coordinate"""
 
+        if self.__check_static_members() == 1:
+            return 1
+
+        grid_shift = [dim - 0.5*dim for dim in mni_grid_size]
         mni_space = np.zeros(mni_grid_size)
+        for coord in self.aba['mni_coords'].data:
+            for entrez_id in self.ge['aba']:
+                mni_space[coord[0]+grid_shift[0], coord[1]+grid_shift[1], coord[2]+grid_shift[2]]
