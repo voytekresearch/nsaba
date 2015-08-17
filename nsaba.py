@@ -5,17 +5,19 @@ Methods to analyze genome-scale gene expression data
 from the Allen Human Brain Atlas in conjunction with
 fMRI activation maps from Neurosynth
 
-Authors: Simon Haxby, Scott Susi, Torben Noto
+Authors: Simon Haxby, Torben Noto, Scott Susi
 """
-import numpy as np
-import pandas as pd
 import pickle
 import os
 import itertools
+import numpy as np
+import pandas as pd
 from scipy import spatial
 
 
-class Nsaba(object):
+class NsabaBase(object):
+    """Contains essential base data structures and methods which derived
+    Nsaba classes all depend upon"""
 
     aba = {
         'exp_df': None,
@@ -77,6 +79,9 @@ class Nsaba(object):
 
         cls.ns['features_df'] = pd.read_table(os.path.join(ns_path, ns_files[1]))
         print "%s loaded." % ns_files[1]
+
+
+class Nsaba(NsabaBase):
 
     def __init__(self):
         self.ge = {}
@@ -285,13 +290,9 @@ class Nsaba(object):
             print "Either term['%s'] or one or more Entrez ID keys does not exist; please check arguments" \
                   % ns_term
 
-    def coord_to_ge(self, coord, entrez_ids, search_radii=10, k=20):
-        """ Returns weighted ABA gene expression mean about some MNI coordinate based
+    def __coord_to_ge(self, coord, entrez_ids, search_radii=10, k=20):
+        """ Returns weighted ABA gene expression mean for some MNI coordinate based
         on a list of passed Entrez IDs"""
-        if self.__check_static_members() == 1:
-            return 1
-        if self.check_entrez_struct(entrez_ids) == 1:
-            return 1
 
         ge_for_coord = []
         for entrez_id in entrez_ids:
@@ -305,6 +306,21 @@ class Nsaba(object):
             ge_for_coord.append(weighted_ge_mean)
 
         return ge_for_coord
+
+    def coords_to_ge(self, coords, entrez_ids, search_radii=10, k=20):
+        """ Returns Returns weighted ABA gene expression mean for a list MNI coordinate based
+        on a list of passed Entrez IDs"""
+        if self.__check_static_members() == 1:
+            return 1
+        if self.check_entrez_struct(entrez_ids) == 1:
+            return 1
+
+        ge_for_coords = []
+        for coord in coords:
+            ge_for_coord = self.__coord_to_ge(coord, entrez_ids, search_radii, k)
+            ge_for_coords.append(ge_for_coord)
+
+        return np.array(ge_for_coords)
 
     def set_ns_weight_f(self, f):
         try:
@@ -323,39 +339,3 @@ class Nsaba(object):
                 print "Unassigned Nsaba 'ns' static variable: see Nsaba.ns_load(path)"
                 return 1
         return 0
-
-class NsabaBuilder(Nsaba):
-    """ Nsaba heavy duty building tasks"""
-    def __init__(self):
-        Nsaba.__init__(self)
-
-    def __proceed_check(self):
-        warning_flag = True
-        while warning_flag:
-            y_n = raw_input("WARNING: this operation can take upwards of an hour, proceed? (Y/n): ")
-            if y_n == 'Y':
-                warning_flag = False
-            elif y_n == 'n':
-                return 1
-            else:
-                print "Invalid response: %s" % y_n
-        return 0
-
-    def get_aba_ge_all(self):
-        """ Returns a dictionary with ABA gene expression coefficient across all genes
-        at sampled locations"""
-
-        if self.__check_static_members() == 1:
-            return 1
-        if self.__proceed_check() == 1:
-            return 1
-
-        entrez_ids = self.aba['probe_df']['entrez_id'][
-            self.aba['probe_df']['entrez_id'].notnull()].unique().astype(int)
-
-        self.get_aba_ge(entrez_ids)
-
-    def build_sparse_ge_mat(self, mni_grid_size=(200,200,200)):
-        """ Builds sparse 3D MNI numpy grid, and assigns a gene expression pointer to that coordinate"""
-
-        mni_space = np.zeros(mni_grid_size)
