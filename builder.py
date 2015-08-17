@@ -1,5 +1,14 @@
-import Nsaba
+# -*- coding: utf-8 -*-
+"""
+builder.py: Contains NsabaBuilder, a class
+designed one-time-use, heavy duty, time consuming
+operations with the Nsaba.
+
+Author: Simon Haxby
+"""
+from nsaba import Nsaba
 import numpy as np
+
 
 class NsabaBuilder(Nsaba):
     """ Nsaba heavy duty building tasks"""
@@ -38,6 +47,7 @@ class NsabaBuilder(Nsaba):
         if self.__check_static_members() == 1:
             return 1
 
+        # Talk to Torben about implementation
         grid_shift = [dim - 0.5*dim for dim in mni_grid_size]
         mni_space = np.zeros(mni_grid_size)
         for coord in self.aba['mni_coords'].data:
