@@ -306,6 +306,91 @@ class Nsaba(object):
 
         return ge_for_coord
 
+    def visualize_ge(self, gene):
+        for e in gene:
+            if e in self.ge:
+                import matplotlib.pyplot as plt
+                import matplotlib.cm as cm
+                from mpl_toolkits.mplot3d import Axes3D
+                fig = plt.figure()
+                ax = fig.add_subplot(111, projection='3d')
+                weights = self.ge[e]
+                colors = cm.jet(weights/max(weights))
+                color_map = cm.ScalarMappable(cmap=cm.jet)
+                color_map.set_array(weights)
+                fig.colorbar(color_map)
+
+                x = self.aba['mni_coords'].data[:, 0]
+                y = self.aba['mni_coords'].data[:, 1]
+                z = self.aba['mni_coords'].data[:, 2]
+
+                ax.scatter(x, y, z, c=colors, alpha=0.4)
+            else:
+                print 'Gene '+str(e) + ' has not been initialized. Use self.get_aba_ge([' + str(e) + '])'
+        ax.set_title('Gene Expression of gene ID ' + str(entrez))
+
+        return fig
+
+    def visualize_ns(self, term, points=200):
+        if term in self.term:
+            term_index = self.ns['features_df'].columns.get_loc(term)
+            import matplotlib.pyplot as plt
+            import matplotlib.cm as cm
+            from mpl_toolkits.mplot3d import Axes3D
+            rand_point_inds = np.random.random_integers(0, len(np.squeeze(zip(self.ns['mni_coords'].data))), points)
+            rand_points = np.squeeze(zip(self.ns['mni_coords'].data))[rand_point_inds]
+            weights = []
+            inds_of_real_points_with_no_fucking_missing_study_ids = []
+            for rand_point in range(len(rand_points)):
+                if len(self.coord_to_terms(rand_points[rand_point].astype(list))) > 0:
+                    inds_of_real_points_with_no_fucking_missing_study_ids.append(rand_point_inds[rand_point])
+                    weights.append(self.coord_to_terms(rand_points[rand_point].astype(list))[term_index])
+            fig = plt.figure()
+            ax = fig.add_subplot(111, projection='3d')
+            colors = cm.jet(weights/max(weights))
+            color_map = cm.ScalarMappable(cmap=cm.jet)
+            color_map.set_array(weights)
+            fig.colorbar(color_map)
+            x = self.ns['mni_coords'].data[inds_of_real_points_with_no_fucking_missing_study_ids, 0]
+            y = self.ns['mni_coords'].data[inds_of_real_points_with_no_fucking_missing_study_ids, 1]
+            z = self.ns['mni_coords'].data[inds_of_real_points_with_no_fucking_missing_study_ids, 2]
+        else:
+            print 'Term '+term + ' has not been initialized. Use self.get_ns_act(' + term + ',thresh = 0.01)'
+        ax.scatter(x, y, z, c=colors, alpha=0.4)
+        ax.set_title('Estimation of ' + term)
+
+        return fig
+
+    def visualize_ns_ge(self, term, gene):
+        for g in gene:
+            if g in self.ge:
+                if term in self.term:
+                    import matplotlib.pyplot as plt
+                    import matplotlib.cm as cm
+                    ge_ns_mat = self.make_ge_ns_mat(term, gene)
+
+                    # correlation
+                    correlation = np.corrcoef(ge_ns_mat[:, 0], ge_ns_mat[:, 1])
+
+                    # linear regression
+                    X = np.vstack([ge_ns_mat[:, 0], np.ones(len(ge_ns_mat[:, 0]))]).T
+                    m, c = np.linalg.lstsq(X, ge_ns_mat[:, 1])[0]
+
+                    # print 'Correlation between ' + term + ' and gene number ' + str(gene)
+                    # print correlation
+                    # print 'Linear regression between ' + term + ' and gene number ' + str(gene) +' Slope =' + str(m) + ' y intercept = '+ str(c)
+                    fig = plt.figure()
+                    ax = fig.add_subplot(111)
+                    plt.plot(ge_ns_mat[:, 0], ge_ns_mat[:, 1], '.')
+                    plt.plot([min(ge_ns_mat[:, 0]), max(ge_ns_mat[:, 0])], [m*min(ge_ns_mat[:, 0])+c, m*max(ge_ns_mat[:, 0])+c], 'r')
+                    ax.set_xlabel(str(gene))
+                    ax.set_ylabel(term)
+                    return correlation, [m, c]
+                else:
+                    print 'Term '+term + ' has not been initialized. Use self.get_ns_act(' + term + ',thresh = 0.01)'
+            else:
+                print 'Gene '+str(g) + ' has not been initialized. Use self.get_aba_ge([' + str(g) + '])'
+
     def set_ns_weight_f(self, f):
         try:
             print "Test: f(e) = %.2f" % f(np.e)
