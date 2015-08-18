@@ -84,6 +84,17 @@ class NsabaBase(object):
         cls.ns['mni_coords'] = spatial.KDTree(mni_coords)
         print "Nsaba.ns['mni_coords'] initialized."
 
+        cls.ns['id_dict'] = {}
+        c = 0
+
+        for i in cls.ns['database_df'].loc[:, 'id']:
+            if i not in cls.ns['id_dict']:
+                cls.ns['id_dict'][i] = [(np.floor(cls.ns['database_df']['x'].iloc[c]), np.floor(cls.ns['database_df']['y'].iloc[c]), np.floor(cls.ns['database_df']['z'].iloc[c]))]
+                c += 1
+            else:
+                cls.ns['id_dict'][i].append((np.floor(cls.ns['database_df']['x'].iloc[c]), np.floor(cls.ns['database_df']['y'].iloc[c]), np.floor(cls.ns['database_df']['z'].iloc[c])))
+        return 0
+
 class Nsaba(NsabaBase):
 
     def __init__(self):
@@ -522,7 +533,7 @@ class Nsaba(NsabaBase):
         ax.set_xlabel(genes[0])
         ax.set_ylabel(genes[1])
         return correlation, [m, c]
-    
+
     def set_ns_weight_f(self, f):
         try:
             print "Test: f(e) = %.2f" % f(np.e)
