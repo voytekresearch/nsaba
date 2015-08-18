@@ -5,7 +5,7 @@ Methods to analyze genome-scale gene expression data
 from the Allen Human Brain Atlas in conjunction with
 fMRI activation maps from Neurosynth
 
-Authors: Simon Haxby, Torben Noto, Scott Susi
+Authors: Simon Haxby & Torben Noto
 """
 import pickle
 import os

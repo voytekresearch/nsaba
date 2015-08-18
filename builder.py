@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 builder.py: Contains NsabaBuilder, a class
-designed one-time-use, heavy duty, time consuming
+designed for one-time-use, heavy duty, time consuming
 operations with the Nsaba.
 
-Author: Simon Haxby
+Author: Simon Haxby & Torben Noto
 """
 from nsaba import Nsaba
 import numpy as np
