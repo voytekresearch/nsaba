@@ -12,7 +12,10 @@ from mpl_toolkits.mplot3d import Axes3D
 
 class NsabaVisualizer(object):
     def __init__(self, nsaba_obj):
-        self.no = nsaba_obj
+        if type(nsaba_obj) == Nsaba:
+            self.no = nsaba_obj
+        else:
+            raise ValueError("NsabaVisualizer() parameter not a Nsaba instance")
     
     def visualize_ge(self, gene):
         for e in gene:
