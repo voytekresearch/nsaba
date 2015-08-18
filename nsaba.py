@@ -151,17 +151,82 @@ class Nsaba(NsabaBase):
         else:
             return False
 
-    def __coord_to_ids(self, coord):
+    def is_id(self, study_id):
+        """ Checks if ID is registered """
+        if len(self.ns['features_df']['pmid'] == study_id) > 0:
+            if len(self.ns['database_df']['id'] == study_id) > 0:  # added layer because motherfuckers are missing data
+                return True
+        else:
+            return False
+
+    def is_coord(self, coordinate):
+        """ Checks if an x,y,z coordinate in list form matches a NS data point"""
+        zipped_coordinates = np.squeeze(zip(self.ns['mni_coords'].data))
+        for this_coordinate in zipped_coordinates:
+            if this_coordinate[0] == coordinate[0]:
+                if this_coordinate[1] == coordinate[1]:
+                    if this_coordinate[2] == coordinate[2]:
+                        return True
+        return False
+
+    def coord_to_ids(self, coordinate):
         """ Uses the study dictionary above to find study ids from x,y,z coordinates """
-        # Use Later?
+        ids = []
+        for i, coords in self.ns['id_dict'].items():
+            for this_coordinate in coords:
+                if this_coordinate[0] == coordinate[0]:
+                    if this_coordinate[1] == coordinate[1]:
+                        if this_coordinate[2] == coordinate[2]:
+                            if i not in ids:
+                                if self.is_id(i):
+                                    ids.append(i)
+        return ids
 
-        return
-
-    def __id_to_terms(self, ID):
+    def __id_to_terms(self, study_id):
         """ Finds all of the term heat values of a given ID """
-        # Use Later?
+        if self.is_id(study_id):
+            term_vector_off_by_1 = np.squeeze(self.ns['features_df'].loc[self.ns['features_df']['pmid'] == study_id].as_matrix())
+            # shifting to remove id index from vector
+            return term_vector_off_by_1[1:]
+        else:
+            return 'Invalid study id'
 
-        return
+    def coord_to_terms(self, coord):
+        ids = self.coord_to_ids(coord)
+        if len(ids) == 1:
+            # one study
+            terms = self.__id_to_terms(ids)
+        elif len(ids) > 1:
+            # multiple studies
+            temp = []
+            for multiple_id in ids:
+                temp.append(self.__id_to_terms(multiple_id))
+                terms = np.mean(temp, 0)
+        else:
+            # print 'No terms found for id' + str(ids) + 'using coordinates:' + str(coord)
+            terms = []
+        return terms
+
+    def build_ns_coord_study_matrix(self, save_location=''):
+        """ builds a 4d matrix of the term heats where we have NS studies """
+
+        matrix_size = 100
+        ns_big_matrix = np.zeros((matrix_size*2, matrix_size*2, matrix_size*2, 3406))
+
+        for x in xrange(matrix_size*2):
+            for y in xrange(matrix_size*2):
+                for z in xrange(matrix_size*2):
+                    if self.is_coord((x-matrix_size, y-matrix_size, z-matrix_size)):
+                        ns_big_matrix[x][y][z][:] = self.coord_to_terms((x-matrix_size, y-matrix_size, z-matrix_size))
+            if np.mod(x, 2):
+                print str(x) + ' percent complete'
+
+        self.ns['ns_study_matrix'] = ns_big_matrix
+        if save_location:
+            np.save(save_location, ns_big_matrix)
+        else:
+            print 'You have the option to save this matrix by inputing a save location and filename'
+        return ns_big_matrix
 
     def __term_to_coords(self, term, thresh=0):
         """ Finds coordinates associated with a given term.
