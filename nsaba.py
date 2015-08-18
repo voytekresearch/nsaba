@@ -93,6 +93,7 @@ class NsabaBase(object):
                 c += 1
             else:
                 cls.ns['id_dict'][i].append((np.floor(cls.ns['database_df']['x'].iloc[c]), np.floor(cls.ns['database_df']['y'].iloc[c]), np.floor(cls.ns['database_df']['z'].iloc[c])))
+                c += 1
         return 0
 
 class Nsaba(NsabaBase):
