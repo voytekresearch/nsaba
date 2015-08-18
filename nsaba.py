@@ -5,7 +5,7 @@ Methods to analyze genome-scale gene expression data
 from the Allen Human Brain Atlas in conjunction with
 fMRI activation maps from Neurosynth
 
-Authors: Simon Haxby, Torben Noto, Scott Susi
+Authors: Simon Haxby & Torben Noto
 """
 import pickle
 import os
@@ -104,7 +104,7 @@ class Nsaba(NsabaBase):
         self.__ns_weight_f = lambda r: 1. / r ** 2
 
     def check_entrez_struct(self, entrez_ids):
-        """ Checks if 'entrez_ids' parameter is an non-str iterable"""
+        """Checks if 'entrez_ids' parameter is an non-str iterable"""
         try:
             iter(entrez_ids)
         except TypeError:
@@ -118,7 +118,7 @@ class Nsaba(NsabaBase):
                 return 0
 
     def get_aba_ge(self, entrez_ids):
-        """ Retrieves an stores gene expression coefficients in ABA dictionary based on a
+        """Retrieves an stores gene expression coefficients in ABA dictionary based on a
         a passed list of Entrez IDs"""
 
         if self.__check_static_members() == 1:
@@ -149,7 +149,7 @@ class Nsaba(NsabaBase):
         print "'ge' dictionary successfully loaded"
 
     def is_term(self, term):
-        """ Checks if this term is in the neurosynth database """
+        """Checks if this term is in the neurosynth database """
         if self.__check_static_members() == 1:
             return 1
         if term in self.ns['features_df'].columns:
@@ -158,16 +158,16 @@ class Nsaba(NsabaBase):
             return False
 
     def is_id(self, ID):
+        """Checks if ID is registered """
         if self.__check_static_members() == 1:
             return 1
-        """ Checks if ID is registered """
         if (self.ns['features_df']['pmid'] == ID).any():
             return True
         else:
             return False
 
     def is_id(self, study_id):
-        """ Checks if ID is registered """
+        """Checks if ID is registered """
         if len(self.ns['features_df']['pmid'] == study_id) > 0:
             if len(self.ns['database_df']['id'] == study_id) > 0:  # added layer because motherfuckers are missing data
                 return True
@@ -175,7 +175,7 @@ class Nsaba(NsabaBase):
             return False
 
     def is_coord(self, coordinate):
-        """ Checks if an x,y,z coordinate in list form matches a NS data point"""
+        """Checks if an x,y,z coordinate in list form matches a NS data point"""
         zipped_coordinates = np.squeeze(zip(self.ns['mni_coords'].data))
         for this_coordinate in zipped_coordinates:
             if this_coordinate[0] == coordinate[0]:
@@ -185,7 +185,7 @@ class Nsaba(NsabaBase):
         return False
 
     def coord_to_ids(self, coordinate):
-        """ Uses the study dictionary above to find study ids from x,y,z coordinates """
+        """Uses the study dictionary above to find study ids from x,y,z coordinates """
         ids = []
         for i, coords in self.ns['id_dict'].items():
             for this_coordinate in coords:
@@ -198,7 +198,7 @@ class Nsaba(NsabaBase):
         return ids
 
     def __id_to_terms(self, study_id):
-        """ Finds all of the term heat values of a given ID """
+        """Finds all of the term heat values of a given ID """
         if self.is_id(study_id):
             term_vector_off_by_1 = np.squeeze(self.ns['features_df'].loc[self.ns['features_df']['pmid'] == study_id].as_matrix())
             # shifting to remove id index from vector
@@ -222,29 +222,8 @@ class Nsaba(NsabaBase):
             terms = []
         return terms
 
-    def build_ns_coord_study_matrix(self, save_location=''):
-        """ builds a 4d matrix of the term heats where we have NS studies """
-
-        matrix_size = 100
-        ns_big_matrix = np.zeros((matrix_size*2, matrix_size*2, matrix_size*2, 3406))
-
-        for x in xrange(matrix_size*2):
-            for y in xrange(matrix_size*2):
-                for z in xrange(matrix_size*2):
-                    if self.is_coord((x-matrix_size, y-matrix_size, z-matrix_size)):
-                        ns_big_matrix[x][y][z][:] = self.coord_to_terms((x-matrix_size, y-matrix_size, z-matrix_size))
-            if np.mod(x, 2):
-                print str(x) + ' percent complete'
-
-        self.ns['ns_study_matrix'] = ns_big_matrix
-        if save_location:
-            np.save(save_location, ns_big_matrix)
-        else:
-            print 'You have the option to save this matrix by inputing a save location and filename'
-        return ns_big_matrix
-
     def __term_to_coords(self, term, thresh=0):
-        """ Finds coordinates associated with a given term.
+        """Finds coordinates associated with a given term.
         Returns NS coordinate tree and ID/coordinate/activation DataFrame"""
         term_ids_act = self.ns['features_df'].loc[self.ns['features_df'][term] > thresh, ['pmid', term]]
         term_ids = term_ids_act['pmid'].tolist()
@@ -259,7 +238,7 @@ class Nsaba(NsabaBase):
             return ns_coord_tree, term_coords.merge(term_ids_act)
 
     def __sphere(self, xyz, coord_tree, max_rad=5):
-        """ Returns 3D Array containing coordinates in each layer of the sphere """
+        """Returns 3D Array containing coordinates in each layer of the sphere """
         sphere_bucket = []
         set_bucket = []
 
@@ -276,12 +255,12 @@ class Nsaba(NsabaBase):
         return [layer for layer in rev_iter]
 
     def __knn_search(self, xyz, coord_tree, max_rad=5, k=20):
-        """ KNN search of NS coordinates about ABA coordinates """
+        """KNN search of NS coordinates about ABA coordinates """
         r, inds = coord_tree.query(xyz, k)
         return inds[r < max_rad], r[r < max_rad]
 
     def __get_act_values(self, bucket, weight, term, ns_coord_act_df):
-        """ Returns weighted NS activation """
+        """Returns weighted NS activation """
         bucket_act_vec = []
         for coords in bucket:
             coord = ns_coord_act_df[(ns_coord_act_df['x'] == coords[0])
@@ -292,7 +271,7 @@ class Nsaba(NsabaBase):
         return np.array(bucket_act_vec)*weight
 
     def __knn_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii, k):
-        """ KNN method """
+        """KNN method """
         for irow, xyz in enumerate(self.aba['mni_coords'].data):
             coord_inds, radii = self.__knn_search(xyz, ns_coord_tree, search_radii, k)
             coords = ns_coord_tree.data[coord_inds]
@@ -305,7 +284,7 @@ class Nsaba(NsabaBase):
                 self.term[term]['ns_act_vector'].append(act_coeff)
 
     def __sphere_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii):
-        """ Sphere buckets method"""
+        """Sphere buckets method"""
         for irow, xyz in enumerate(self.aba['mni_coords'].data):
             sphere_bucket = self.__sphere(xyz, ns_coord_tree, search_radii)
             sphere_vals = [0, 0]
@@ -325,7 +304,7 @@ class Nsaba(NsabaBase):
                 self.term[term]['ns_act_vector'].append(act_coeff)
 
     def get_ns_act(self, term, thresh=0, method='knn', search_radii=5, k=None):
-        """ Generates NS activation vector about ABA MNI coordinates  """
+        """Generates NS activation vector about ABA MNI coordinates  """
         if self.__check_static_members() == 1:
             return 1
         if not self.is_term(term):
@@ -371,7 +350,7 @@ class Nsaba(NsabaBase):
                   % ns_term
 
     def __coord_to_ge(self, coord, entrez_ids, search_radii=10, k=20):
-        """ Returns weighted ABA gene expression mean for some MNI coordinate based
+        """Returns weighted ABA gene expression mean for some MNI coordinate based
         on a list of passed Entrez IDs"""
 
         ge_for_coord = []
@@ -388,7 +367,7 @@ class Nsaba(NsabaBase):
         return ge_for_coord
 
     def coords_to_ge(self, coords, entrez_ids, search_radii=10, k=20):
-        """ Returns Returns weighted ABA gene expression mean for a list MNI coordinate based
+        """Returns Returns weighted ABA gene expression mean for a list MNI coordinate based
         on a list of passed Entrez IDs"""
         if self.__check_static_members() == 1:
             return 1
@@ -401,139 +380,6 @@ class Nsaba(NsabaBase):
             ge_for_coords.append(ge_for_coord)
 
         return np.array(ge_for_coords)
-
-    def visualize_ge(self, gene):
-        for e in gene:
-            if e in self.ge:
-                import matplotlib.pyplot as plt
-                import matplotlib.cm as cm
-                from mpl_toolkits.mplot3d import Axes3D
-                fig = plt.figure()
-                ax = fig.add_subplot(111, projection='3d')
-                weights = self.ge[e]
-                colors = cm.jet(weights/max(weights))
-                color_map = cm.ScalarMappable(cmap=cm.jet)
-                color_map.set_array(weights)
-                fig.colorbar(color_map)
-
-                x = self.aba['mni_coords'].data[:, 0]
-                y = self.aba['mni_coords'].data[:, 1]
-                z = self.aba['mni_coords'].data[:, 2]
-
-                ax.scatter(x, y, z, c=colors, alpha=0.4)
-            else:
-                print 'Gene '+str(e) + ' has not been initialized. Use self.get_aba_ge([' + str(e) + '])'
-        ax.set_title('Gene Expression of gene ID ' + str(gene))
-
-        return fig
-
-    def visualize_ns(self, term, points=200):
-        if term in self.term:
-            term_index = self.ns['features_df'].columns.get_loc(term)
-            import matplotlib.pyplot as plt
-            import matplotlib.cm as cm
-            from mpl_toolkits.mplot3d import Axes3D
-            rand_point_inds = np.random.random_integers(0, len(np.squeeze(zip(self.ns['mni_coords'].data))), points)
-            rand_points = np.squeeze(zip(self.ns['mni_coords'].data))[rand_point_inds]
-            weights = []
-            inds_of_real_points_with_no_fucking_missing_study_ids = []
-            for rand_point in range(len(rand_points)):
-                if len(self.coord_to_terms(rand_points[rand_point].astype(list))) > 0:
-                    inds_of_real_points_with_no_fucking_missing_study_ids.append(rand_point_inds[rand_point])
-                    weights.append(self.coord_to_terms(rand_points[rand_point].astype(list))[term_index])
-            fig = plt.figure()
-            ax = fig.add_subplot(111, projection='3d')
-            colors = cm.jet(weights/max(weights))
-            color_map = cm.ScalarMappable(cmap=cm.jet)
-            color_map.set_array(weights)
-            fig.colorbar(color_map)
-            x = self.ns['mni_coords'].data[inds_of_real_points_with_no_fucking_missing_study_ids, 0]
-            y = self.ns['mni_coords'].data[inds_of_real_points_with_no_fucking_missing_study_ids, 1]
-            z = self.ns['mni_coords'].data[inds_of_real_points_with_no_fucking_missing_study_ids, 2]
-        else:
-            print 'Term '+term + ' has not been initialized. Use self.get_ns_act(' + term + ',thresh = 0.01)'
-        ax.scatter(x, y, z, c=colors, alpha=0.4)
-        ax.set_title('Estimation of ' + term)
-
-        return fig
-
-    def visualize_ns_ge(self, term, gene):
-        for g in gene:
-            if g in self.ge:
-                if term in self.term:
-                    import matplotlib.pyplot as plt
-                    import matplotlib.cm as cm
-                    ge_ns_mat = self.make_ge_ns_mat(term, gene)
-
-                    # correlation
-                    correlation = np.corrcoef(ge_ns_mat[:, 0], ge_ns_mat[:, 1])
-
-                    # linear regression
-                    X = np.vstack([ge_ns_mat[:, 0], np.ones(len(ge_ns_mat[:, 0]))]).T
-                    m, c = np.linalg.lstsq(X, ge_ns_mat[:, 1])[0]
-
-                    # print 'Correlation between ' + term + ' and gene number ' + str(gene)
-                    # print correlation
-                    # print 'Linear regression between ' + term + ' and gene number ' + str(gene) +' Slope =' + str(m) + ' y intercept = '+ str(c)
-                    fig = plt.figure()
-                    ax = fig.add_subplot(111)
-                    plt.plot(ge_ns_mat[:, 0], ge_ns_mat[:, 1], '.')
-                    plt.plot([min(ge_ns_mat[:, 0]), max(ge_ns_mat[:, 0])], [m*min(ge_ns_mat[:, 0])+c, m*max(ge_ns_mat[:, 0])+c], 'r')
-                    ax.set_xlabel(str(gene))
-                    ax.set_ylabel(term)
-                    return correlation, [m, c]
-                else:
-                    print 'Term '+term + ' has not been initialized. Use self.get_ns_act(' + term + ',thresh = 0.01)'
-            else:
-                print 'Gene '+str(g) + ' has not been initialized. Use self.get_aba_ge([' + str(g) + '])'
-
-    def visualize_ns_ns(self, term1, term2):
-        """Visualizing the relationship between two term vectors"""
-        if term1 in self.term:
-            if term2 in self.term:
-                import matplotlib.pyplot as plt
-
-                # correlation
-                correlation = np.corrcoef(self.term[term1]['ns_act_vector'], self.term[term2]['ns_act_vector'])
-                # linear regression
-                regression_matrix = np.vstack([self.term[term1]['ns_act_vector'], np.ones(len(self.term[term1]['ns_act_vector']))]).T
-                m, c = np.linalg.lstsq(regression_matrix, self.term[term2]['ns_act_vector'])[0]
-
-                # plotting
-                fig = plt.figure()
-                ax = fig.add_subplot(111)
-                plt.plot(self.term[term1]['ns_act_vector'], self.term[term2]['ns_act_vector'], '.')
-                plt.plot([min(self.term[term1]['ns_act_vector']), max(self.term[term1]['ns_act_vector'])], [m*min(self.term[term2]['ns_act_vector'])+c, m*max(self.term[term2]['ns_act_vector'])+c], 'r')
-                ax.set_xlabel(term1)
-                ax.set_ylabel(term2)
-                return correlation, [m, c]
-            else:
-                print 'Term '+term2 + ' has not been initialized. Use self.get_ns_act(' + term2 + ',thresh = 0.01)'
-        else:
-            print 'Term '+term1 + ' has not been initialized. Use self.get_ns_act(' + term1 + ',thresh = 0.01)'
-
-    def visualize_ge_ge(self, genes):
-        """Visualizing two gene vectors"""
-        for gene in genes:
-            if gene not in self.ge:
-                print 'Gene '+str(g) + ' has not been initialized. Use self.get_aba_ge([' + str(g) + '])'
-                return []
-        import matplotlib.pyplot as plt
-
-        # correlation
-        correlation = np.corrcoef(self.ge[genes[0]], self.ge[genes[1]])
-        # linear regression
-        regression_matrix = np.vstack([self.ge[genes[0]], np.ones(len(self.ge[genes[0]]))]).T
-        m, c = np.linalg.lstsq(regression_matrix, self.ge[genes[1]])[0]
-
-        # plotting
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        plt.plot(self.ge[genes[0]], self.ge[genes[1]], '.')
-        plt.plot([min(self.ge[genes[0]]), max(self.ge[genes[0]])], [m*min(self.ge[genes[1]])+c, m*max(self.ge[genes[1]])+c], 'r')
-        ax.set_xlabel(genes[0])
-        ax.set_ylabel(genes[1])
-        return correlation, [m, c]
 
     def set_ns_weight_f(self, f):
         try:
