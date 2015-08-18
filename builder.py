@@ -46,6 +46,8 @@ class NsabaBuilder(Nsaba):
 
         if self.__check_static_members() == 1:
             return 1
+        if self.__proceed_check() == 1:
+            return 1
 
         # Talk to Torben about implementation
         grid_shift = [dim - 0.5*dim for dim in mni_grid_size]
@@ -58,6 +60,8 @@ class NsabaBuilder(Nsaba):
         """Builds a 4D matrix of the term heats where we have NS studies """
 
         if self.__check_static_members() == 1:
+            return 1
+        if self.__proceed_check() == 1:
             return 1
 
         matrix_size = 100
