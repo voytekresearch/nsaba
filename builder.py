@@ -11,7 +11,7 @@ import numpy as np
 
 
 class NsabaBuilder(Nsaba):
-    """ Nsaba heavy duty building tasks"""
+    """Nsaba heavy duty building tasks"""
     def __init__(self):
         Nsaba.__init__(self)
 
@@ -28,7 +28,7 @@ class NsabaBuilder(Nsaba):
         return 0
 
     def get_aba_ge_all(self):
-        """ Returns a dictionary with ABA gene expression coefficient across all genes
+        """Returns a dictionary with ABA gene expression coefficient across all genes
         at sampled locations"""
 
         if self.__check_static_members() == 1:
@@ -42,7 +42,7 @@ class NsabaBuilder(Nsaba):
         self.get_aba_ge(entrez_ids)
 
     def build_sparse_ge_mat(self, mni_grid_size=(200, 200, 200)):
-        """ Builds sparse 3D MNI numpy grid, and assigns a gene expression pointer to that coordinate"""
+        """Builds sparse 3D MNI numpy grid, and assigns a gene expression pointer to that coordinate"""
 
         if self.__check_static_members() == 1:
             return 1
@@ -52,4 +52,28 @@ class NsabaBuilder(Nsaba):
         mni_space = np.zeros(mni_grid_size)
         for coord in self.aba['mni_coords'].data:
             for entrez_id in self.ge['aba']:
-                mni_space[coord[0]+grid_shift[0], coord[1]+grid_shift[1], coord[2]+grid_shift[2]]
+                mni_space[coord[0]+grid_shift[0], coord[1]+grid_shift[1], coord[2]+grid_shift[2]] = 0
+
+    def build_sparse_ns_mat(self, save_location='.'):
+        """Builds a 4D matrix of the term heats where we have NS studies """
+
+        if self.__check_static_members() == 1:
+            return 1
+
+        matrix_size = 100
+        ns_big_matrix = np.zeros((matrix_size*2, matrix_size*2, matrix_size*2, 3406))
+
+        for x in xrange(matrix_size*2):
+            for y in xrange(matrix_size*2):
+                for z in xrange(matrix_size*2):
+                    if self.is_coord((x-matrix_size, y-matrix_size, z-matrix_size)):
+                        ns_big_matrix[x][y][z][:] = self.coord_to_terms((x-matrix_size, y-matrix_size, z-matrix_size))
+            if np.mod(x, 2):
+                print str(x) + ' percent complete'
+
+        self.ns['ns_study_matrix'] = ns_big_matrix
+        if save_location:
+            np.save(save_location, ns_big_matrix)
+        else:
+            print 'You have the option to save this matrix by inputing a save location and filename'
+        return ns_big_matrix
