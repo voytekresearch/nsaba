@@ -66,6 +66,10 @@ class NsabaBase(object):
         cls.aba['mni_coords'] = spatial.KDTree(mni_coords)
         print "Nsaba.aba['mni_coords'] initialized."
 
+        mni_coords = cls.ns['database_df'].loc[:, 'x':'z'].as_matrix().astype(float)
+        cls.ns['mni_coords'] = spatial.KDTree(mni_coords)
+        print "Nsaba.ns['mni_coords'] initialized."
+
     @classmethod
     def ns_load(cls, ns_path=".", ns_files=None):
         """Initialization of 'ns' dictionary"""
