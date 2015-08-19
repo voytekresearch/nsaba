@@ -15,7 +15,7 @@ class NsabaBuilder(Nsaba):
     def __init__(self):
         Nsaba.__init__(self)
 
-    def __proceed_check(self):
+    def _proceed_check(self):
         warning_flag = True
         while warning_flag:
             y_n = raw_input("WARNING: this operation can take upwards of an hour, proceed? (Y/n): ")
@@ -31,9 +31,9 @@ class NsabaBuilder(Nsaba):
         """Returns a dictionary with ABA gene expression coefficient across all genes
         at sampled locations"""
 
-        if self.__check_static_members() == 1:
+        if self._check_static_members() == 1:
             return 1
-        if self.__proceed_check() == 1:
+        if self._proceed_check() == 1:
             return 1
 
         entrez_ids = self.aba['probe_df']['entrez_id'][
@@ -44,9 +44,9 @@ class NsabaBuilder(Nsaba):
     def build_sparse_ge_mat(self, mni_grid_size=(200, 200, 200)):
         """Builds sparse 3D MNI numpy grid, and assigns a gene expression pointer to that coordinate"""
 
-        if self.__check_static_members() == 1:
+        if self._check_static_members() == 1:
             return 1
-        if self.__proceed_check() == 1:
+        if self._proceed_check() == 1:
             return 1
 
         # Talk to Torben about implementation
@@ -59,9 +59,9 @@ class NsabaBuilder(Nsaba):
     def build_sparse_ns_mat(self, save_location='.'):
         """Builds a 4D matrix of the term heats where we have NS studies """
 
-        if self.__check_static_members() == 1:
+        if self._check_static_members() == 1:
             return 1
-        if self.__proceed_check() == 1:
+        if self._proceed_check() == 1:
             return 1
 
         matrix_size = 100

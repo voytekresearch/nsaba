@@ -166,13 +166,13 @@ class Nsaba(NsabaBase):
         else:
             return False
 
-    def is_id(self, study_id):
-        """Checks if ID is registered """
-        if len(self.ns['features_df']['pmid'] == study_id) > 0:
-            if len(self.ns['database_df']['id'] == study_id) > 0:  # added layer because motherfuckers are missing data
-                return True
-        else:
-            return False
+    # def is_id(self, study_id):
+    #     """Checks if ID is registered """
+    #     if len(self.ns['features_df']['pmid'] == study_id) > 0:
+    #         if len(self.ns['database_df']['id'] == study_id) > 0:  # added layer because motherfuckers are missing data
+    #             return True
+    #     else:
+    #         return False
 
     def is_coord(self, coordinate):
         """Checks if an x,y,z coordinate in list form matches a NS data point"""
@@ -197,7 +197,7 @@ class Nsaba(NsabaBase):
                                     ids.append(i)
         return ids
 
-    def __id_to_terms(self, study_id):
+    def _id_to_terms(self, study_id):
         """Finds all of the term heat values of a given ID """
         if self.is_id(study_id):
             term_vector_off_by_1 = np.squeeze(self.ns['features_df'].loc[self.ns['features_df']['pmid'] == study_id].as_matrix())
@@ -222,7 +222,7 @@ class Nsaba(NsabaBase):
             terms = []
         return terms
 
-    def __term_to_coords(self, term, thresh=0):
+    def _term_to_coords(self, term, thresh=0):
         """Finds coordinates associated with a given term.
         Returns NS coordinate tree and ID/coordinate/activation DataFrame"""
         term_ids_act = self.ns['features_df'].loc[self.ns['features_df'][term] > thresh, ['pmid', term]]
@@ -237,7 +237,7 @@ class Nsaba(NsabaBase):
             term_ids_act.rename(columns={'pmid': 'id'}, inplace=True)
             return ns_coord_tree, term_coords.merge(term_ids_act)
 
-    def __sphere(self, xyz, coord_tree, max_rad=5):
+    def _sphere(self, xyz, coord_tree, max_rad=5):
         """Returns 3D Array containing coordinates in each layer of the sphere """
         sphere_bucket = []
         set_bucket = []
@@ -254,12 +254,12 @@ class Nsaba(NsabaBase):
 
         return [layer for layer in rev_iter]
 
-    def __knn_search(self, xyz, coord_tree, max_rad=5, k=20):
+    def _knn_search(self, xyz, coord_tree, max_rad=5, k=20):
         """KNN search of NS coordinates about ABA coordinates """
         r, inds = coord_tree.query(xyz, k)
         return inds[r < max_rad], r[r < max_rad]
 
-    def __get_act_values(self, bucket, weight, term, ns_coord_act_df):
+    def _get_act_values(self, bucket, weight, term, ns_coord_act_df):
         """Returns weighted NS activation """
         bucket_act_vec = []
         for coords in bucket:
@@ -270,7 +270,7 @@ class Nsaba(NsabaBase):
 
         return np.array(bucket_act_vec)*weight
 
-    def __knn_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii, k):
+    def _knn_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii, k):
         """KNN method """
         for irow, xyz in enumerate(self.aba['mni_coords'].data):
             coord_inds, radii = self.__knn_search(xyz, ns_coord_tree, search_radii, k)
@@ -283,7 +283,7 @@ class Nsaba(NsabaBase):
                 act_coeff = np.sum(weighted_means) / np.sum(weight)
                 self.term[term]['ns_act_vector'].append(act_coeff)
 
-    def __sphere_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii):
+    def _sphere_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii):
         """Sphere buckets method"""
         for irow, xyz in enumerate(self.aba['mni_coords'].data):
             sphere_bucket = self.__sphere(xyz, ns_coord_tree, search_radii)
@@ -349,7 +349,7 @@ class Nsaba(NsabaBase):
             print "Either term['%s'] or one or more Entrez ID keys does not exist; please check arguments" \
                   % ns_term
 
-    def __coord_to_ge(self, coord, entrez_ids, search_radii=10, k=20):
+    def _coord_to_ge(self, coord, entrez_ids, search_radii=10, k=20):
         """Returns weighted ABA gene expression mean for some MNI coordinate based
         on a list of passed Entrez IDs"""
 
@@ -388,7 +388,7 @@ class Nsaba(NsabaBase):
         except TypeError:
             print "'f' is improper, ensure 'f' receives only one parameter and returns a numeric type"
 
-    def __check_static_members(self):
+    def _check_static_members(self):
         for val in self.aba.itervalues():
             if val is None:
                 print "Unassigned Nsaba 'aba' static variable: see Nsaba.aba_load(path)"
