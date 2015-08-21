@@ -121,7 +121,7 @@ class Nsaba(NsabaBase):
         """Retrieves an stores gene expression coefficients in ABA dictionary based on a
         a passed list of Entrez IDs"""
 
-        if self.__check_static_members() == 1:
+        if self._check_static_members() == 1:
             return 1
         if self.check_entrez_struct(entrez_ids) == 1:
             return 1
@@ -139,7 +139,7 @@ class Nsaba(NsabaBase):
             self.ge[entrez_id] = np.mean(ge_mat, axis=1)
 
     def pickle_ge(self, pkl_file="Nsaba_ABA_ge.pkl", output_dir='.'):
-        if self.__check_static_members() == 1:
+        if self._check_static_members() == 1:
             return 1
         pickle.dump(self.ge, open(os.path.join(output_dir, pkl_file), 'wb'))
         print "%s successfully created" % pkl_file
@@ -150,7 +150,7 @@ class Nsaba(NsabaBase):
 
     def is_term(self, term):
         """Checks if this term is in the neurosynth database """
-        if self.__check_static_members() == 1:
+        if self._check_static_members() == 1:
             return 1
         if term in self.ns['features_df'].columns:
             return True
@@ -159,7 +159,7 @@ class Nsaba(NsabaBase):
 
     def is_id(self, ID):
         """Checks if ID is registered """
-        if self.__check_static_members() == 1:
+        if self._check_static_members() == 1:
             return 1
         if (self.ns['features_df']['pmid'] == ID).any():
             return True
@@ -210,12 +210,12 @@ class Nsaba(NsabaBase):
         ids = self.coord_to_ids(coord)
         if len(ids) == 1:
             # one study
-            terms = self.__id_to_terms(ids)
+            terms = self._id_to_terms(ids)
         elif len(ids) > 1:
             # multiple studies
             temp = []
             for multiple_id in ids:
-                temp.append(self.__id_to_terms(multiple_id))
+                temp.append(self._id_to_terms(multiple_id))
                 terms = np.mean(temp, 0)
         else:
             # print 'No terms found for id' + str(ids) + 'using coordinates:' + str(coord)
@@ -273,10 +273,10 @@ class Nsaba(NsabaBase):
     def _knn_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii, k):
         """KNN method """
         for irow, xyz in enumerate(self.aba['mni_coords'].data):
-            coord_inds, radii = self.__knn_search(xyz, ns_coord_tree, search_radii, k)
+            coord_inds, radii = self._knn_search(xyz, ns_coord_tree, search_radii, k)
             coords = ns_coord_tree.data[coord_inds]
             weight = self.__ns_weight_f(radii)
-            weighted_means = self.__get_act_values(coords, weight, term, ns_coord_act_df)
+            weighted_means = self._get_act_values(coords, weight, term, ns_coord_act_df)
             if len(weighted_means) == 0:
                 self.term[term]['aba_void_indices'].append(irow)
             else:
@@ -286,11 +286,11 @@ class Nsaba(NsabaBase):
     def _sphere_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii):
         """Sphere buckets method"""
         for irow, xyz in enumerate(self.aba['mni_coords'].data):
-            sphere_bucket = self.__sphere(xyz, ns_coord_tree, search_radii)
+            sphere_bucket = self._sphere(xyz, ns_coord_tree, search_radii)
             sphere_vals = [0, 0]
             for w, bucket in enumerate(sphere_bucket):
                 weight = self.__ns_weight_f(w + 1)
-                bucket_mean = np.mean(self.__get_act_values(bucket, weight, term, ns_coord_act_df))
+                bucket_mean = np.mean(self._get_act_values(bucket, weight, term, ns_coord_act_df))
                 if np.isnan(bucket_mean):
                     sphere_vals[0] += 0
                     sphere_vals[1] += 0
@@ -305,13 +305,13 @@ class Nsaba(NsabaBase):
 
     def get_ns_act(self, term, thresh=0, method='knn', search_radii=5, k=None):
         """Generates NS activation vector about ABA MNI coordinates  """
-        if self.__check_static_members() == 1:
+        if self._check_static_members() == 1:
             return 1
         if not self.is_term(term):
             print "'%s' is not a registered term." % term
             return 1
 
-        ns_coord_tree, ns_coord_act_df = self.__term_to_coords(term, thresh)
+        ns_coord_tree, ns_coord_act_df = self._term_to_coords(term, thresh)
         if type(ns_coord_tree) == int:
             return 1
 
@@ -322,17 +322,17 @@ class Nsaba(NsabaBase):
         if method == 'knn':
             if k is None:
                 k = 20
-            self.__knn_method(term, ns_coord_act_df, ns_coord_tree, search_radii, k)
+            self._knn_method(term, ns_coord_act_df, ns_coord_tree, search_radii, k)
         elif method == 'sphere':
             if k is not None:
                 raise ValueError("'k' parameter cannot be used with 'sphere' method.")
-            self.__sphere_method(term, ns_coord_act_df, ns_coord_tree, search_radii)
+            self._sphere_method(term, ns_coord_act_df, ns_coord_tree, search_radii)
         else:
             raise TypeError("'%s' is not a valid parameter value for 'method' parameter, use either 'knn' or 'sphere"
                             % method)
 
     def make_ge_ns_mat(self, ns_term, entrez_ids):
-        if self.__check_static_members() == 1:
+        if self._check_static_members() == 1:
             return 1
         if self.check_entrez_struct(entrez_ids) == 1:
             return 1
@@ -355,7 +355,7 @@ class Nsaba(NsabaBase):
 
         ge_for_coord = []
         for entrez_id in entrez_ids:
-            coord_inds, radii = self.__knn_search(coord, self.aba['mni_coords'], search_radii, k)
+            coord_inds, radii = self._knn_search(coord, self.aba['mni_coords'], search_radii, k)
             if len(coord_inds) == 0:
                 print "No ABA coordinates are within search radius of specified coordinate"
                 break
@@ -369,14 +369,14 @@ class Nsaba(NsabaBase):
     def coords_to_ge(self, coords, entrez_ids, search_radii=10, k=20):
         """Returns Returns weighted ABA gene expression mean for a list MNI coordinate based
         on a list of passed Entrez IDs"""
-        if self.__check_static_members() == 1:
+        if self._check_static_members() == 1:
             return 1
         if self.check_entrez_struct(entrez_ids) == 1:
             return 1
 
         ge_for_coords = []
         for coord in coords:
-            ge_for_coord = self.__coord_to_ge(coord, entrez_ids, search_radii, k)
+            ge_for_coord = self._coord_to_ge(coord, entrez_ids, search_radii, k)
             ge_for_coords.append(ge_for_coord)
 
         return np.array(ge_for_coords)
