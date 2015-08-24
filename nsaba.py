@@ -263,7 +263,7 @@ class Nsaba(NsabaBase):
         """Returns weighted NS activation """
         bucket_act_vec = []
         for coords in bucket:
-            coord = ns_coord_act_df[(ns_coord_act_df['x'] == coords[0])
+            coord = ns_coord_act_df.ix[(ns_coord_act_df['x'] == coords[0])
                                     & (ns_coord_act_df['y'] == coords[1])
                                     & (ns_coord_act_df['z'] == coords[2])][term]
             bucket_act_vec.append(coord.mean())
