@@ -96,6 +96,7 @@ class NsabaBase(object):
                 c += 1
         return 0
 
+
 class Nsaba(NsabaBase):
 
     def __init__(self):
@@ -221,6 +222,34 @@ class Nsaba(NsabaBase):
             # print 'No terms found for id' + str(ids) + 'using coordinates:' + str(coord)
             terms = []
         return terms
+
+    def coords_to_term(self, coords, term, search_radii=5):
+        # only uses knn
+        if self.is_term(term):
+            term_index = self.ns['features_df'].columns.get_loc(term)
+            term_vector = np.zeros((1, len(coords)))
+            c = 0
+            for coord in coords:
+                temp_term = self.coord_to_terms(coord)
+                if len(temp_term) > 0:
+                    term_vector[0, c] = temp_term[term_index]
+                    c += 1
+                else:
+                    r, inds = self.ns['mni_coords'].query(coord, search_radii)
+                    temp_coords = self.ns['mni_coords'].data[inds]
+                    weight = 1./r**2
+                    term_acts = np.zeros((1, len(temp_coords)))
+                    i = 0
+                    for temp_coord in temp_coords:
+                        term_acts[0, i] = self.coord_to_terms(temp_coord)[term_index]
+                        i += 1
+                    print term_acts * weight
+                    print sum(term_acts * weight)
+                    term_vector[0, c] = sum(np.squeeze(term_acts * weight))
+
+            return term_vector
+        else:
+            raise TypeError("'%s' is not a valid term." % term)
 
     def _term_to_coords(self, term, thresh=0):
         """Finds coordinates associated with a given term.
