@@ -6,7 +6,7 @@ Created on Mon Jul 13 16:33:15 2015
 @author: Simon Haxby
 """
 
-from nsaba.nsaba import Nsaba
+from nsaba import Nsaba
 
 if __name__ == '__main__':
 
@@ -20,10 +20,12 @@ if __name__ == '__main__':
     A.get_aba_ge([733, 33, 88])
     A.ge.keys()
 
-    # Coordinate to gene expression
-    A.coords_to_ge([[10, 20, 30]], [733, 33, 88], search_radii=20)
-
     # Getting NS activation vector for term 'attention'
     term = 'attention'
-    A.get_ns_act(term, thresh=0, k=20, search_radii=3)
+    A.get_ns_act(term, thresh=.3, k=20, search_radii=3)
+
+    # Make matrix combining activation and gene expression vectors
     print A.make_ge_ns_mat(term, [733, 33, 88])
+
+    # Coordinate to gene expression
+    A.coords_to_ge([[10, 20, 30]], [733, 33, 88], search_radii=20)

@@ -1,4 +1,4 @@
-import testmethods as tm
+import nsaba.testmethods as tm
 
 test = tm.NsabaTestMethods()
 test.aba_load('../data_dir')
