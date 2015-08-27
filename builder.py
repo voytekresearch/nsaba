@@ -50,6 +50,7 @@ class NsabaBuilder(Nsaba):
             return 1
 
         # Talk to Torben about implementation
+        # Development on hold 8/27/15
         grid_shift = [dim - 0.5*dim for dim in mni_grid_size]
         mni_space = np.zeros(mni_grid_size)
         for coord in self.aba['mni_coords'].data:
