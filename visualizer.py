@@ -37,8 +37,6 @@ class NsabaVisualizer(object):
                 print 'Gene '+str(e) + ' has not been initialized. Use self.no.get_aba_ge([' + str(e) + '])'
         ax.set_title('Gene Expression of gene ID ' + str(gene))
 
-        return fig
-
     def visualize_ns(self, term, points=200):
         if term in self.no.term:
             term_index = self.no.ns['features_df'].columns.get_loc(term)
@@ -63,8 +61,6 @@ class NsabaVisualizer(object):
             print 'Term '+term + ' has not been initialized. Use self.no.get_ns_act(' + term + ',thresh = 0.01)'
         ax.scatter(x, y, z, c=colors, alpha=0.4)
         ax.set_title('Estimation of ' + term)
-
-        return fig
 
     def visualize_ns_ge(self, term, gene):
         for g in gene:
