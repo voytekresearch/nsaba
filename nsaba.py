@@ -145,7 +145,7 @@ class Nsaba(NsabaBase):
         pickle.dump(self.ge, open(os.path.join(output_dir, pkl_file), 'wb'))
         print "%s successfully created" % pkl_file
 
-    def load_ge_pickle(self, file_path="ABA_ge.pkl"):
+    def load_ge_pickle(self, file_path="Nsaba_ABA_ge.pkl"):
         self.ge = pickle.load(open(file_path, 'rb'))
         print "'ge' dictionary successfully loaded"
 
