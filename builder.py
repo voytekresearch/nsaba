@@ -9,7 +9,7 @@ Author: Simon Haxby & Torben Noto
 from nsaba import Nsaba
 import numpy as np
 
-from testtools import not_operational
+from nsabatools import not_operational
 
 class NsabaBuilder(Nsaba):
     """Nsaba heavy duty building tasks"""

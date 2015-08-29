@@ -26,8 +26,10 @@ class NsabaAnalysis(object):
         
         print "To use seaborn plotting functionality in Jupyter, '%matplotlib inline' must be enabled"
 
-    def t_test(self, term, gene, quant):
+    def t_test(self, term, gene, quant=None):
         """ T-Test of gene expression between term and non-term coordinates"""
+        if not quant:
+            quant = 85
         analmat = self.no.make_ge_ns_mat(term, [gene])
         thres = np.percentile(analmat[:, 1], quant)
         # Splitting groups

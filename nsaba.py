@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 from scipy import spatial
 
-from testtools import not_operational
+from nsabatools import not_operational, prints
 
 class NsabaBase(object):
     """Contains essential base data structures and methods which derived
@@ -33,6 +33,7 @@ class NsabaBase(object):
     }
 
     @classmethod
+    @prints('This may take a minute or two ...')
     def aba_load(cls, aba_path=".", csv_names=None):
         """Initialization of 'aba' dictionary"""
 
@@ -44,8 +45,6 @@ class NsabaBase(object):
 
         if len(csv_names) != 3:
             raise IndexError("'csv_names' must a list of 3 'str' variables")
-
-        print 'This may take a minute or two ...'
 
         csv_path = os.path.join(aba_path, csv_names[1])
         cls.aba['si_df'] = pd.read_csv(csv_path)
@@ -68,6 +67,7 @@ class NsabaBase(object):
         print "Nsaba.aba['mni_coords'] initialized."
 
     @classmethod
+    @prints('This may take a minute or two ...')
     def ns_load(cls, ns_path=".", ns_files=None):
         """Initialization of 'ns' dictionary"""
 
@@ -97,6 +97,7 @@ class NsabaBase(object):
                 c += 1
         return 0
 
+    @staticmethod
     def _check_static_members(self):
         for val in self.aba.itervalues():
             if val is None:
@@ -151,8 +152,9 @@ class Nsaba(NsabaBase):
         pickle.dump(self.ge, open(os.path.join(output_dir, pkl_file), 'wb'))
         print "%s successfully created" % pkl_file
 
-    def load_ge_pickle(self, file_path="Nsaba_ABA_ge.pkl"):
-        self.ge = pickle.load(open(file_path, 'rb'))
+    @prints('This may take a minute or two ...')
+    def load_ge_pickle(self, pkl_file="Nsaba_ABA_ge.pkl", path='.'):
+        self.ge = pickle.load(open(os.path.join(path, pkl_file), 'rb'))
         print "'ge' dictionary successfully loaded"
 
     def is_term(self, term):
@@ -302,6 +304,7 @@ class Nsaba(NsabaBase):
 
         return np.array(bucket_act_vec)*weight
 
+    @prints('This may take a few minutes...')
     def _knn_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii, k):
         """KNN method """
         for irow, xyz in enumerate(self.aba['mni_coords'].data):
@@ -315,6 +318,7 @@ class Nsaba(NsabaBase):
                 act_coeff = np.sum(weighted_means) / np.sum(weight)
                 self.term[term]['ns_act_vector'].append(act_coeff)
 
+    @prints('This may take a few minutes...')
     def _sphere_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii):
         """Sphere buckets method"""
         for irow, xyz in enumerate(self.aba['mni_coords'].data):
@@ -335,7 +339,7 @@ class Nsaba(NsabaBase):
                 act_coeff = sphere_vals[0] / sphere_vals[1]
                 self.term[term]['ns_act_vector'].append(act_coeff)
 
-    def get_ns_act(self, term, thresh=0, method='knn', search_radii=5, k=None):
+    def get_ns_act(self, term, thresh=-1, method='knn', search_radii=5, k=None):
         """Generates NS activation vector about ABA MNI coordinates  """
         if not self.is_term(term):
             print "'%s' is not a registered term." % term
