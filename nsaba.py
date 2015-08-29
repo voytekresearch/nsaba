@@ -97,7 +97,6 @@ class NsabaBase(object):
                 c += 1
         return 0
 
-    @staticmethod
     def _check_static_members(self):
         for val in self.aba.itervalues():
             if val is None:

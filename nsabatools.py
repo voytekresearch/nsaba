@@ -12,7 +12,6 @@ def not_operational(func):
 
 
 class prints(object):
-
     def __init__(self, string):
         self.string = string
 
