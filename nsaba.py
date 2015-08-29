@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 from scipy import spatial
 
+from testtools import not_operational
 
 class NsabaBase(object):
     """Contains essential base data structures and methods which derived
@@ -96,10 +97,19 @@ class NsabaBase(object):
                 c += 1
         return 0
 
+    def _check_static_members(self):
+        for val in self.aba.itervalues():
+            if val is None:
+                raise NotImplementedError("Unassigned Nsaba 'aba' static variable: see Nsaba.aba_load(path)")
+        for val in self.ns.itervalues():
+            if val is None:
+                raise NotImplementedError("Unassigned Nsaba 'ns' static variable: see Nsaba.ns_load(path)")
 
 class Nsaba(NsabaBase):
+    """ Main Nsaba class. Contains methods data fetching, estimation and organization."""
 
     def __init__(self):
+        self._check_static_members()
         self.ge = {}
         self.term = {}
         self.__ns_weight_f = lambda r: 1. / r ** 2
@@ -122,8 +132,6 @@ class Nsaba(NsabaBase):
         """Retrieves an stores gene expression coefficients in ABA dictionary based on a
         a passed list of Entrez IDs"""
 
-        if self._check_static_members() == 1:
-            return 1
         if self.check_entrez_struct(entrez_ids) == 1:
             return 1
 
@@ -140,8 +148,6 @@ class Nsaba(NsabaBase):
             self.ge[entrez_id] = np.mean(ge_mat, axis=1)
 
     def pickle_ge(self, pkl_file="Nsaba_ABA_ge.pkl", output_dir='.'):
-        if self._check_static_members() == 1:
-            return 1
         pickle.dump(self.ge, open(os.path.join(output_dir, pkl_file), 'wb'))
         print "%s successfully created" % pkl_file
 
@@ -151,8 +157,6 @@ class Nsaba(NsabaBase):
 
     def is_term(self, term):
         """Checks if this term is in the neurosynth database """
-        if self._check_static_members() == 1:
-            return 1
         if term in self.ns['features_df'].columns:
             return True
         else:
@@ -160,20 +164,19 @@ class Nsaba(NsabaBase):
 
     def is_id(self, ID):
         """Checks if ID is registered """
-        if self._check_static_members() == 1:
-            return 1
         if (self.ns['features_df']['pmid'] == ID).any():
             return True
         else:
             return False
 
-    # def is_id(self, study_id):
-    #     """Checks if ID is registered """
-    #     if len(self.ns['features_df']['pmid'] == study_id) > 0:
-    #         if len(self.ns['database_df']['id'] == study_id) > 0:  # added layer because motherfuckers are missing data
-    #             return True
-    #     else:
-    #         return False
+    @not_operational
+    def is_id_alt(self, study_id):
+        """Checks if ID is registered """
+        if len(self.ns['features_df']['pmid'] == study_id) > 0:
+            if len(self.ns['database_df']['id'] == study_id) > 0:  # added layer because motherfuckers are missing data
+                return True
+        else:
+            return False
 
     def is_coord(self, coordinate):
         """Checks if an x,y,z coordinate in list form matches a NS data point"""
@@ -334,8 +337,6 @@ class Nsaba(NsabaBase):
 
     def get_ns_act(self, term, thresh=0, method='knn', search_radii=5, k=None):
         """Generates NS activation vector about ABA MNI coordinates  """
-        if self._check_static_members() == 1:
-            return 1
         if not self.is_term(term):
             print "'%s' is not a registered term." % term
             return 1
@@ -361,8 +362,6 @@ class Nsaba(NsabaBase):
                             % method)
 
     def make_ge_ns_mat(self, ns_term, entrez_ids):
-        if self._check_static_members() == 1:
-            return 1
         if self.check_entrez_struct(entrez_ids) == 1:
             return 1
 
@@ -398,8 +397,6 @@ class Nsaba(NsabaBase):
     def coords_to_ge(self, coords, entrez_ids, search_radii=10, k=20):
         """Returns Returns weighted ABA gene expression mean for a list MNI coordinate based
         on a list of passed Entrez IDs"""
-        if self._check_static_members() == 1:
-            return 1
         if self.check_entrez_struct(entrez_ids) == 1:
             return 1
 
@@ -417,13 +414,4 @@ class Nsaba(NsabaBase):
         except TypeError:
             print "'f' is improper, ensure 'f' receives only one parameter and returns a numeric type"
 
-    def _check_static_members(self):
-        for val in self.aba.itervalues():
-            if val is None:
-                print "Unassigned Nsaba 'aba' static variable: see Nsaba.aba_load(path)"
-                return 1
-        for val in self.ns.itervalues():
-            if val is None:
-                print "Unassigned Nsaba 'ns' static variable: see Nsaba.ns_load(path)"
-                return 1
-        return 0
+

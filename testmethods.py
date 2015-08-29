@@ -3,13 +3,6 @@ import numpy as np
 from nsaba import Nsaba
 
 
-# Uses for methods that may be imported and accidentally used.
-def not_operational(func):
-    def func_wrap(*args, **kwargs):
-        raise ImportError("'%s': is still in development and not operational." % func.func_name)
-    return func_wrap
-
-
 class NsabaTestMethods(Nsaba):
     def __init__(self):
         Nsaba.__init__(self)
