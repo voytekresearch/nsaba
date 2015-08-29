@@ -18,5 +18,5 @@ class prints(object):
     def __call__(self, f):
         def f_wrapper(*args, **kwargs):
             print self.string
-            f(*args, **kwargs)
+            return f(*args, **kwargs)
         return f_wrapper

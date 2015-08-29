@@ -64,7 +64,7 @@ class NsabaBase(object):
 
         mni_coords = cls.aba['si_df'].loc[:, 'mni_x':'mni_z'].as_matrix().astype(float)
         cls.aba['mni_coords'] = spatial.KDTree(mni_coords)
-        print "Nsaba.aba['mni_coords'] initialized."
+        print "Nsaba.aba['mni_coords'] initialized.\n"
 
     @classmethod
     @prints('This may take a minute or two ...')
@@ -83,19 +83,25 @@ class NsabaBase(object):
 
         mni_coords = cls.ns['database_df'].loc[:, 'x':'z'].as_matrix().astype(float)
         cls.ns['mni_coords'] = spatial.KDTree(mni_coords)
-        print "Nsaba.ns['mni_coords'] initialized."
+        print "Nsaba.ns['mni_coords'] initialized.\n"
 
+    @classmethod
+    @prints("Could take a minute? IDK")
+    def ns_load_id_dict(cls):
+        "Weird ID dictionary thing; Torbencraft"
         cls.ns['id_dict'] = {}
         c = 0
-
         for i in cls.ns['database_df'].loc[:, 'id']:
             if i not in cls.ns['id_dict']:
-                cls.ns['id_dict'][i] = [(np.floor(cls.ns['database_df']['x'].iloc[c]), np.floor(cls.ns['database_df']['y'].iloc[c]), np.floor(cls.ns['database_df']['z'].iloc[c]))]
+                cls.ns['id_dict'][i] = [(np.floor(cls.ns['database_df']['x'].iloc[c]),
+                                         np.floor(cls.ns['database_df']['y'].iloc[c]),
+                                         np.floor(cls.ns['database_df']['z'].iloc[c]))]
                 c += 1
             else:
-                cls.ns['id_dict'][i].append((np.floor(cls.ns['database_df']['x'].iloc[c]), np.floor(cls.ns['database_df']['y'].iloc[c]), np.floor(cls.ns['database_df']['z'].iloc[c])))
+                cls.ns['id_dict'][i].append((np.floor(cls.ns['database_df']['x'].iloc[c]),
+                                             np.floor(cls.ns['database_df']['y'].iloc[c]),
+                                             np.floor(cls.ns['database_df']['z'].iloc[c])))
                 c += 1
-        return 0
 
     def _check_static_members(self):
         for val in self.aba.itervalues():

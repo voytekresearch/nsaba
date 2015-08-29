@@ -6,6 +6,7 @@ Author: Simon Haxby
 from nsaba import Nsaba
 from geneinfo import gene_info
 from nsabatools import prints
+import collections
 from scipy import stats
 import numpy as np
 import seaborn as sns
@@ -13,7 +14,7 @@ import random
 
 
 def cohen_d(x1, x2, n1, n2):
-    return (np.mean(x1) - np.mean(x2)) / np.sqrt( ((n1-1)*np.var(x1) + (n2-1)*np.var(x2)) / (n1 + n2 -2) )
+    return (np.mean(x1) - np.mean(x2)) / np.sqrt(((n1-1)*np.var(x1) + (n2-1)*np.var(x2)) / (n1 + n2-2))
 
 
 class NsabaAnalysis(object):
@@ -23,7 +24,8 @@ class NsabaAnalysis(object):
             self.no = nsaba_obj
         else:
             raise ValueError("NsabaAnalysis() parameter not a Nsaba instance")
-        
+
+        self.gene_rec = collections.namedtuple("gene_rec", "entrez cohen_d p_value")
         print "To use seaborn plotting functionality in Jupyter, '%matplotlib inline' must be enabled"
 
     def t_test(self, term, gene, quant=None):
@@ -44,15 +46,14 @@ class NsabaAnalysis(object):
 
     @prints('This may take a couple of minutes ...')
     def t_test_multi(self, term, quant=None, sample_num=None):
-
         if term not in self.no.term:
             raise ValueError("Term activation not generated for '%s" % term)
         if not sample_num:
             sample_num = len(self.no.ge.keys())
         if not quant:
-            thres = np.percentile(self.no.term[term]['ns_act_vector'], 85)
-        else:
-            thres = np.percentile(self.no.term[term]['ns_act_vector'], quant)
+            quant = 85
+
+        thres = np.percentile(self.no.term[term]['ns_act_vector'], quant)
 
         if len(self.no.ge) < sample_num:
             raise ValueError("Sample number exceeds stored number of Entrez IDs")
@@ -61,47 +62,52 @@ class NsabaAnalysis(object):
         sam_ids = random.sample(self.no.ge.keys(), sample_num)
         ge_mat = self.no.make_ge_ns_mat(term, sam_ids).T[:-1]
 
+        ttest_metrics = {'term': term, "quantile": quant, "gene_sample_size": sample_num}
         gene_stats = []
         for eid, ge in zip(sam_ids, ge_mat):
+            # Split coordinates in to term and non-term groups
             gt_thres = [ge[i] for i in xrange(aba_sam_num) if self.no.term[term]['ns_act_vector'][i] > thres]
             lt_thres = [ge[i] for i in xrange(aba_sam_num) if self.no.term[term]['ns_act_vector'][i] <= thres]
             test_stats = stats.ttest_ind(lt_thres, gt_thres)
             d = cohen_d(lt_thres, gt_thres, len(lt_thres), len(gt_thres))
+            # One-sided T-Test
             if test_stats[0] <= 0:
-                gene_stats.append((eid, d, test_stats[1]))
+                gene_stats.append(self.gene_rec(eid, d, test_stats[1]))
             else:
                 continue
 
-        gene_stats.sort(key=lambda gen: gen[1])
-        return gene_stats
+        # Sort effect sizes from greatest to smallest in magnitude
+        gene_stats.sort(key=lambda rec: rec.cohen_d)
+        ttest_metrics['results'] = gene_stats
+
+        return ttest_metrics
 
     @prints('Fetching NIH gene descriptions ...')
-    def fetch_gene_descriptions(self, gene_stats, nih_fetch_num=20, alpha=.05):
+    def fetch_gene_descriptions(self, ttest_metrics, nih_fetch_num=20, alpha=.05):
         """Prints: ID, p-value, Cohen's d, gene description for genes with the largest effect sizes"""
-        gene_stats.sort(key=lambda ge: ge[1])
         top_genes = []
-        for i in xrange(nih_fetch_num):
+        for rec in ttest_metrics['results'][:nih_fetch_num]:
             try:
-                top_genes.append((gene_stats[i][0], gene_stats[i][1], gene_stats[i][2],
-                                   gene_info(str(gene_stats[i][0]))[0]))
+                top_genes.append((rec.entrez, rec.cohen_d, rec.p_value, gene_info(str(rec.entrez))[0]))
             except TypeError:
                 continue
 
-        print "\nCorrected Bonferroni Alpha: %.3E\n\n" % (alpha/float(len(gene_stats)))
+        print "\nCorrected Bonferroni Alpha: %.3E\n\n" % (alpha/float(ttest_metrics['gene_sample_size']))
         for eid, coh_d, p_val, descr in top_genes:
             if len(descr) == 1:
                 print "%d (p = %.3E; d = %.3f): < No description found >\n\n" % (eid, p_val, coh_d)
             else:
                 print "%d (p = %.3E; d = %.3f): %s\n\n" % (eid, p_val, coh_d, descr)
 
-    def p_val_distr(self, gene_stats):
+    def p_val_distr(self, ttest_metrics):
         """Visualizing p-value distribution"""
-        p_vals = [p[2] for p in gene_stats]
-        sig = sum([ p < .05/float(len(gene_stats)) for p in p_vals])
-        print "Percent Significant (Bonferroni Correction; alpha = .05): %.3f %%" % (100*sig/float(len(gene_stats)))
+        p_vals = [rec.p_value for rec in ttest_metrics['results']]
+        sig = sum((p < .05/float(ttest_metrics['gene_sample_size']) for p in p_vals))
+        print "Percent Significant (Bonferroni Correction; alpha = .05): %.3f %%" % \
+              (100*sig/float(ttest_metrics['gene_sample_size']))
         sns.distplot(p_vals, norm_hist=False, bins=75, kde=False, axlabel='p-values');
 
-    def effect_size_distr(self, gene_stats):
+    def effect_size_distr(self, ttest_metrics):
         """Visualizing effect-size distribution"""
-        d_vals = [p[1] for p in gene_stats]
+        d_vals = [rec.cohen_d for rec in ttest_metrics['results']]
         sns.distplot(d_vals, norm_hist=False, bins=75, kde=False, axlabel='effect sizes');
