@@ -11,7 +11,7 @@ def not_operational(func):
     return func_wrap
 
 
-class prints(object):
+class preprint(object):
     def __init__(self, string):
         self.string = string
 

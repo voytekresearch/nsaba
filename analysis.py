@@ -5,7 +5,7 @@ Author: Simon Haxby
 """
 from nsaba import Nsaba
 from geneinfo import gene_info
-from nsabatools import prints
+from nsabatools import preprint
 import collections
 from scipy import stats
 import numpy as np
@@ -44,7 +44,7 @@ class NsabaAnalysis(object):
         sns.distplot(gt_thres);
         sns.distplot(lt_thres);
 
-    @prints('This may take a couple of minutes ...')
+    @preprint('This may take a couple of minutes ...')
     def t_test_multi(self, term, quant=None, sample_num=None):
         if term not in self.no.term:
             raise ValueError("Term activation not generated for '%s" % term)
@@ -82,7 +82,7 @@ class NsabaAnalysis(object):
 
         return ttest_metrics
 
-    @prints('Fetching NIH gene descriptions ...')
+    @preprint('Fetching NIH gene descriptions ...')
     def fetch_gene_descriptions(self, ttest_metrics, nih_fetch_num=20, alpha=.05):
         """Prints: ID, p-value, Cohen's d, gene description for genes with the largest effect sizes"""
         top_genes = []

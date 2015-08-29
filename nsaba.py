@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 from scipy import spatial
 
-from nsabatools import not_operational, prints
+from nsabatools import not_operational, preprint
 
 class NsabaBase(object):
     """Contains essential base data structures and methods which derived
@@ -33,7 +33,7 @@ class NsabaBase(object):
     }
 
     @classmethod
-    @prints('This may take a minute or two ...')
+    @preprint('This may take a minute or two ...')
     def aba_load(cls, aba_path=".", csv_names=None):
         """Initialization of 'aba' dictionary"""
 
@@ -67,7 +67,7 @@ class NsabaBase(object):
         print "Nsaba.aba['mni_coords'] initialized.\n"
 
     @classmethod
-    @prints('This may take a minute or two ...')
+    @preprint('This may take a minute or two ...')
     def ns_load(cls, ns_path=".", ns_files=None):
         """Initialization of 'ns' dictionary"""
 
@@ -86,7 +86,7 @@ class NsabaBase(object):
         print "Nsaba.ns['mni_coords'] initialized.\n"
 
     @classmethod
-    @prints("Could take a minute? IDK")
+    @preprint("Could take a minute? IDK")
     def ns_load_id_dict(cls):
         "Weird ID dictionary thing; Torbencraft"
         cls.ns['id_dict'] = {}
@@ -120,26 +120,21 @@ class Nsaba(NsabaBase):
         self.term = {}
         self.__ns_weight_f = lambda r: 1. / r ** 2
 
-    def check_entrez_struct(self, entrez_ids):
+    def __check_entrez_struct(self, entrez_ids):
         """Checks if 'entrez_ids' parameter is an non-str iterable"""
         try:
             iter(entrez_ids)
         except TypeError:
-            print "Invalid parameter form; please contain entrez ids as 'str' types in iterable container"
-            return 1
+            raise TypeError("Invalid parameter form; please contain entrez ids in iterable container")
         else:
             if isinstance(entrez_ids, str):
-                print "Invalid parameter form; please contain entrez ids as 'str' types in iterable container"
-                return 1
-            else:
-                return 0
+                raise TypeError("Invalid parameter form; please contain entrez ids in iterable container")
 
     def get_aba_ge(self, entrez_ids):
         """Retrieves an stores gene expression coefficients in ABA dictionary based on a
         a passed list of Entrez IDs"""
 
-        if self.check_entrez_struct(entrez_ids) == 1:
-            return 1
+        self.__check_entrez_struct(entrez_ids)
 
         for entrez_id in entrez_ids:
             probe_ids = self.aba['probe_df'].loc[self.aba['probe_df']['entrez_id']
@@ -157,7 +152,7 @@ class Nsaba(NsabaBase):
         pickle.dump(self.ge, open(os.path.join(output_dir, pkl_file), 'wb'))
         print "%s successfully created" % pkl_file
 
-    @prints('This may take a minute or two ...')
+    @preprint('This may take a minute or two ...')
     def load_ge_pickle(self, pkl_file="Nsaba_ABA_ge.pkl", path='.'):
         self.ge = pickle.load(open(os.path.join(path, pkl_file), 'rb'))
         print "'ge' dictionary successfully loaded"
@@ -270,8 +265,7 @@ class Nsaba(NsabaBase):
         try:
             ns_coord_tree = spatial.KDTree(term_coords.loc[:, 'x':'z'].as_matrix().astype(float))
         except ValueError:
-            print "No studies with term: '%s' and threshold: %.2f found" % (term, thresh)
-            return 1, 1
+            raise ValueError("No studies with term: '%s' and threshold: %.2f found" % (term, thresh))
         else:
             term_ids_act.rename(columns={'pmid': 'id'}, inplace=True)
             return ns_coord_tree, term_coords.merge(term_ids_act)
@@ -309,7 +303,7 @@ class Nsaba(NsabaBase):
 
         return np.array(bucket_act_vec)*weight
 
-    @prints('This may take a few minutes...')
+    @preprint('This may take a few minutes...')
     def _knn_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii, k):
         """KNN method """
         for irow, xyz in enumerate(self.aba['mni_coords'].data):
@@ -323,7 +317,7 @@ class Nsaba(NsabaBase):
                 act_coeff = np.sum(weighted_means) / np.sum(weight)
                 self.term[term]['ns_act_vector'].append(act_coeff)
 
-    @prints('This may take a few minutes...')
+    @preprint('This may take a few minutes...')
     def _sphere_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii):
         """Sphere buckets method"""
         for irow, xyz in enumerate(self.aba['mni_coords'].data):
@@ -347,12 +341,9 @@ class Nsaba(NsabaBase):
     def get_ns_act(self, term, thresh=-1, method='knn', search_radii=5, k=None):
         """Generates NS activation vector about ABA MNI coordinates  """
         if not self.is_term(term):
-            print "'%s' is not a registered term." % term
-            return 1
+            raise ValueError("'%s' is not a registered term." % term)
 
         ns_coord_tree, ns_coord_act_df = self._term_to_coords(term, thresh)
-        if type(ns_coord_tree) == int:
-            return 1
 
         self.term[term] = {}
         self.term[term]['ns_act_vector'] = []
@@ -371,8 +362,7 @@ class Nsaba(NsabaBase):
                             % method)
 
     def make_ge_ns_mat(self, ns_term, entrez_ids):
-        if self.check_entrez_struct(entrez_ids) == 1:
-            return 1
+        self.__check_entrez_struct(entrez_ids)
 
         if ns_term in self.term and all([key in self.ge for key in entrez_ids]):
             ge_ns_mat = []
@@ -389,6 +379,7 @@ class Nsaba(NsabaBase):
     def _coord_to_ge(self, coord, entrez_ids, search_radii=10, k=20):
         """Returns weighted ABA gene expression mean for some MNI coordinate based
         on a list of passed Entrez IDs"""
+        self.__check_entrez_struct(entrez_ids)
 
         ge_for_coord = []
         for entrez_id in entrez_ids:
@@ -406,8 +397,7 @@ class Nsaba(NsabaBase):
     def coords_to_ge(self, coords, entrez_ids, search_radii=10, k=20):
         """Returns Returns weighted ABA gene expression mean for a list MNI coordinate based
         on a list of passed Entrez IDs"""
-        if self.check_entrez_struct(entrez_ids) == 1:
-            return 1
+        self.__check_entrez_struct(entrez_ids)
 
         ge_for_coords = []
         for coord in coords:
