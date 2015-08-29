@@ -9,6 +9,7 @@ Author: Simon Haxby & Torben Noto
 from nsaba import Nsaba
 import numpy as np
 
+from testmethods import not_operational
 
 class NsabaBuilder(Nsaba):
     """Nsaba heavy duty building tasks"""
@@ -41,6 +42,7 @@ class NsabaBuilder(Nsaba):
 
         self.get_aba_ge(entrez_ids)
 
+    @not_operational
     def build_sparse_ge_mat(self, mni_grid_size=(200, 200, 200)):
         """Builds sparse 3D MNI numpy grid, and assigns a gene expression pointer to that coordinate"""
 
@@ -57,6 +59,7 @@ class NsabaBuilder(Nsaba):
             for entrez_id in self.ge['aba']:
                 mni_space[coord[0]+grid_shift[0], coord[1]+grid_shift[1], coord[2]+grid_shift[2]] = 0
 
+    @not_operational
     def build_sparse_ns_mat(self, save_location='.'):
         """Builds a 4D matrix of the term heats where we have NS studies """
 
