@@ -16,6 +16,7 @@ from scipy import spatial
 
 from nsabatools import not_operational, preprint
 
+
 class NsabaBase(object):
     """Contains essential base data structures and methods which derived
     Nsaba classes all depend upon"""

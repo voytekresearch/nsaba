@@ -50,6 +50,8 @@ class NsabaAnalysis(object):
             raise ValueError("Term activation not generated for '%s" % term)
         if not sample_num:
             sample_num = len(self.no.ge.keys())
+        elif sample_num <= 0:
+            raise ValueError("'sample_num' parameter must be greater than 0")
         if not quant:
             quant = 85
 
@@ -58,9 +60,10 @@ class NsabaAnalysis(object):
         if len(self.no.ge) < sample_num:
             raise ValueError("Sample number exceeds stored number of Entrez IDs")
 
-        aba_sam_num = len(self.no.ge[random.choice(self.no.ge.keys())])
+
         sam_ids = random.sample(self.no.ge.keys(), sample_num)
         ge_mat = self.no.make_ge_ns_mat(term, sam_ids).T[:-1]
+        aba_sam_num = len(ge_mat[0])
 
         ttest_metrics = {'term': term, "quantile": quant, "gene_sample_size": sample_num}
         gene_stats = []
