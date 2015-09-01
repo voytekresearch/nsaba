@@ -4,13 +4,13 @@ Statistical testing and analysis tools for Nsaba.
 Author: Simon Haxby
 """
 from nsaba import Nsaba
-from geneinfo import gene_info
 from nsabatools import preprint
+from geneinfo import gene_info
+import random
 import collections
 from scipy import stats
 import numpy as np
 import seaborn as sns
-import random
 import matplotlib.pyplot as plt
 
 
