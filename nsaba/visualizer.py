@@ -8,6 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from mpl_toolkits.mplot3d import Axes3D
+from nsabatools import not_operational, preprint
 
 
 class NsabaVisualizer(object):
@@ -26,18 +27,56 @@ class NsabaVisualizer(object):
                 colors = cm.jet(weights/max(weights))
                 color_map = cm.ScalarMappable(cmap=cm.jet)
                 color_map.set_array(weights)
-                fig.colorbar(color_map)
+                # fig.colorbar(color_map)
 
                 x = self.no.aba['mni_coords'].data[:, 0]
                 y = self.no.aba['mni_coords'].data[:, 1]
                 z = self.no.aba['mni_coords'].data[:, 2]
 
-                ax.scatter(x, y, z, c=colors, alpha=0.4)
+                ax.scatter(x, y, z, c=colors, alpha=0.1)
             else:
                 print 'Gene '+str(e) + ' has not been initialized. Use self.no.get_aba_ge([' + str(e) + '])'
         ax.set_title('Gene Expression of gene ID ' + str(gene))
 
-    def visualize_ns(self, term, points=200):
+    def visualize_ns(self, term, no_ids=50):
+        """Visualize the neural heat map of a term. no_ids determines how specific the map is"""
+        if term in self.no.term:
+            try: len(self.no.ns['id_dict']
+            except KeyError: self.no.ns_load_id_dict()
+            heat = self.no.ns['features_df'][term]
+            sorted_heat_vals = sorted(enumerate(heat), key=lambda x: x[1], reverse=True)[0:no_ids]
+            weights = zip(*sorted_heat_vals)[1]
+            inds = zip(*sorted_heat_vals)[0]
+            pmids = [self.no.ns['features_df']['pmid'].ix[ind] for ind in inds]
+            all_coords = []
+            for pmid in pmids:
+                if len(self.no.ns['database_df'].loc[self.no.ns['database_df']['id'] == pmid]) > 0:
+                    all_coords.append(self.no.ns['id_dict'][pmid])
+            xvals = []
+            yvals = []
+            zvals = []
+            new_weights = []
+            wc = 0
+            for coord_set in all_coords:
+                wc += 1
+                for coord in coord_set:
+                    xvals.append(coord[0])
+                    yvals.append(coord[1])
+                    zvals.append(coord[2])
+                    new_weights.append(weights[wc])
+            fig = plt.figure()
+            ax = fig.add_subplot(111, projection='3d')
+            colors = cm.jet(weights/max(weights))
+            color_map = cm.ScalarMappable(cmap=cm.jet)
+            color_map.set_array(weights)
+            fig.colorbar(color_map)
+            ax.scatter(xvals, yvals, zvals, c=colors, alpha=0.1)
+            ax.set_title('Heat map of ' + str(term))
+        else:
+            print 'Term '+term + ' has not been initialized. Use self.no.get_ns_act(' + term + ',thresh = 0.01)'
+
+    @not_operational
+    def visualize_ns_old(self, term, points=200):
         if term in self.no.term:
             term_index = self.no.ns['features_df'].columns.get_loc(term)
             rand_point_inds = np.random.random_integers(0, len(np.squeeze(zip(self.no.ns['mni_coords'].data))), points)
@@ -61,6 +100,7 @@ class NsabaVisualizer(object):
             print 'Term '+term + ' has not been initialized. Use self.no.get_ns_act(' + term + ',thresh = 0.01)'
         ax.scatter(x, y, z, c=colors, alpha=0.4)
         ax.set_title('Estimation of ' + term)
+
 
     def visualize_ns_ge(self, term, gene):
         for g in gene:

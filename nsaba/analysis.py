@@ -96,7 +96,7 @@ class NsabaAnalysis(object):
         top_genes = []
         for rec in ttest_metrics['results'][:nih_fetch_num]:
             try:
-                top_genes.append((rec.entrez, rec.cohen_d, rec.p_value, gene_info(str(rec.entrez))[0]))
+                top_genes.append((rec.entrez, rec.cohen_d, rec.p_value, gene_info(str(int(rec.entrez)))[0]))
             except TypeError:
                 continue
 
