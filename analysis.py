@@ -11,6 +11,7 @@ from scipy import stats
 import numpy as np
 import seaborn as sns
 import random
+import matplotlib.pyplot as plt
 
 
 def cohen_d(x1, x2, n1, n2):
@@ -26,7 +27,7 @@ class NsabaAnalysis(object):
             raise ValueError("NsabaAnalysis() parameter not a Nsaba instance")
 
         self.gene_rec = collections.namedtuple("gene_rec", "entrez cohen_d p_value")
-        print "To use seaborn plotting functionality in Jupyter, '%matplotlib inline' must be enabled"
+        print "To use inline plotting functionality in Jupyter, '%matplotlib inline' must be enabled"
 
     def t_test(self, term, gene, quant=None):
         """ T-Test of gene expression between term and non-term coordinates"""
@@ -59,7 +60,6 @@ class NsabaAnalysis(object):
 
         if len(self.no.ge) < sample_num:
             raise ValueError("Sample number exceeds stored number of Entrez IDs")
-
 
         sam_ids = random.sample(self.no.ge.keys(), sample_num)
         ge_mat = self.no.make_ge_ns_mat(term, sam_ids).T[:-1]
@@ -108,9 +108,15 @@ class NsabaAnalysis(object):
         sig = sum((p < .05/float(ttest_metrics['gene_sample_size']) for p in p_vals))
         print "Percent Significant (Bonferroni Correction; alpha = .05): %.3f %%" % \
               (100*sig/float(ttest_metrics['gene_sample_size']))
-        sns.distplot(p_vals, norm_hist=False, bins=75, kde=False, axlabel='p-values');
+        plt.hist(p_vals, bins=75);
+        plt.title('P-value Distribution');
+        plt.xlabel('p-values');
+        plt.ylabel('frequency');
 
     def effect_size_distr(self, ttest_metrics):
         """Visualizing effect-size distribution"""
         d_vals = [rec.cohen_d for rec in ttest_metrics['results']]
-        sns.distplot(d_vals, norm_hist=False, bins=75, kde=False, axlabel='effect sizes');
+        plt.hist(d_vals, bins=75);
+        plt.title("Effect Size Distribution (Cohen's d)");
+        plt.xlabel('effect sizes');
+        plt.ylabel('frequency');
