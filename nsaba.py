@@ -339,7 +339,7 @@ class Nsaba(NsabaBase):
                 act_coeff = sphere_vals[0] / sphere_vals[1]
                 self.term[term]['ns_act_vector'].append(act_coeff)
 
-    def get_ns_act(self, term, thresh=-1, method='knn', search_radii=5, k=None):
+    def get_ns_act(self, term, thresh=-1, method='knn', search_radii=3, k=None):
         """Generates NS activation vector about ABA MNI coordinates  """
         if not self.is_term(term):
             raise ValueError("'%s' is not a registered term." % term)
@@ -377,7 +377,7 @@ class Nsaba(NsabaBase):
             print "Either term['%s'] or one or more Entrez ID keys does not exist; please check arguments" \
                   % ns_term
 
-    def _coord_to_ge(self, coord, entrez_ids, search_radii=10, k=20):
+    def _coord_to_ge(self, coord, entrez_ids, search_radii=3, k=20):
         """Returns weighted ABA gene expression mean for some MNI coordinate based
         on a list of passed Entrez IDs"""
         self.__check_entrez_struct(entrez_ids)
@@ -395,7 +395,7 @@ class Nsaba(NsabaBase):
 
         return ge_for_coord
 
-    def coords_to_ge(self, coords, entrez_ids, search_radii=10, k=20):
+    def coords_to_ge(self, coords, entrez_ids, search_radii=3, k=20):
         """Returns Returns weighted ABA gene expression mean for a list MNI coordinate based
         on a list of passed Entrez IDs"""
         self.__check_entrez_struct(entrez_ids)
