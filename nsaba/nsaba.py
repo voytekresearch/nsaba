@@ -86,10 +86,11 @@ class NsabaBase(object):
         cls.ns['mni_coords'] = spatial.KDTree(mni_coords)
         print "Nsaba.ns['mni_coords'] initialized.\n"
 
+
     @classmethod
-    @preprint("Could take a minute? IDK")
+    @preprint("This could take a minute")
     def ns_load_id_dict(cls):
-        "Weird ID dictionary thing; Torbencraft"
+        """ID dictionary thing needed for doing some NS analyses"""
         cls.ns['id_dict'] = {}
         c = 0
         for i in cls.ns['database_df'].loc[:, 'id']:
@@ -165,18 +166,12 @@ class Nsaba(NsabaBase):
         else:
             return False
 
-    def is_id(self, ID):
-        """Checks if ID is registered """
-        if (self.ns['features_df']['pmid'] == ID).any():
-            return True
-        else:
-            return False
-
-    @not_operational
-    def is_id_alt(self, study_id):
+    #  @not_operational
+    #  added layer because id mismatches between dataframes
+    def is_id(self, study_id):
         """Checks if ID is registered """
         if len(self.ns['features_df']['pmid'] == study_id) > 0:
-            if len(self.ns['database_df']['id'] == study_id) > 0:  # added layer because motherfuckers are missing data
+            if len(self.ns['database_df']['id'] == study_id) > 0:
                 return True
         else:
             return False
