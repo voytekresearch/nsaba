@@ -86,9 +86,8 @@ class NsabaBase(object):
         cls.ns['mni_coords'] = spatial.KDTree(mni_coords)
         print "Nsaba.ns['mni_coords'] initialized.\n"
 
-
     @classmethod
-    @preprint("This could take a minute")
+    @preprint('This may take a minute or two ...')
     def ns_load_id_dict(cls):
         """ID dictionary thing needed for doing some NS analyses"""
         cls.ns['id_dict'] = {}
@@ -170,8 +169,8 @@ class Nsaba(NsabaBase):
     #  added layer because id mismatches between dataframes
     def is_id(self, study_id):
         """Checks if ID is registered """
-        if len(self.ns['features_df']['pmid'] == study_id) > 0:
-            if len(self.ns['database_df']['id'] == study_id) > 0:
+        if any(self.ns['features_df']['pmid'] == study_id):
+            if any(self.ns['database_df']['id'] == study_id):
                 return True
         else:
             return False
@@ -227,6 +226,10 @@ class Nsaba(NsabaBase):
     def coords_to_term(self, coords, term, search_radii=5):
         # only uses knn
         if self.is_term(term):
+            try:
+                self.ns['id_dict']
+            except KeyError:
+                self.ns_load_id_dict()
             term_index = self.ns['features_df'].columns.get_loc(term)
             term_vector = np.zeros((1, len(coords)))
             c = 0
@@ -242,13 +245,30 @@ class Nsaba(NsabaBase):
                     term_acts = np.zeros((1, len(temp_coords)))
                     i = 0
                     for temp_coord in temp_coords:
-                        term_acts[0, i] = self.coord_to_terms(temp_coord)[term_index]
+                        term_acts[0, i] = self.coord_to_terms(np.floor(temp_coord))[term_index]
                         i += 1
                     term_vector[0, c] = sum(np.squeeze(term_acts * weight))
 
             return term_vector
         else:
             raise TypeError("'%s' is not a valid term." % term)
+
+    # front-facing method to find MNI coordinates with high term associations
+    def term_to_coords(self, term, no_ids=3):
+        if term in self.term:
+            try:
+                self.ns['id_dict'][24379394]
+            except KeyError:
+                self.ns_load_id_dict()
+            heat = self.ns['features_df'][term]
+            sorted_heat_vals = sorted(enumerate(heat), key=lambda x: x[1], reverse=True)[0:no_ids]
+            inds = zip(*sorted_heat_vals)[0]
+            pmids = [self.ns['features_df']['pmid'].ix[ind] for ind in inds]
+            coords = []
+            for pmid in pmids:
+                if self.is_id(pmid):
+                    coords.append(self.ns['id_dict'][pmid])
+            return np.squeeze(coords)
 
     def _term_to_coords(self, term, thresh=0):
         """Finds coordinates associated with a given term.
@@ -375,16 +395,16 @@ class Nsaba(NsabaBase):
         on a list of passed Entrez IDs"""
         self.__check_entrez_struct(entrez_ids)
 
-        ge_for_coord = []
+        ge_for_coord = 0
         for entrez_id in entrez_ids:
             coord_inds, radii = self._knn_search(coord, self.aba['mni_coords'], search_radii, k)
             if len(coord_inds) == 0:
-                print "No ABA coordinates are within search radius of specified coordinate"
+                # print "No ABA coordinates are within search radius of specified coordinate"
                 break
             weight = self.__ns_weight_f(radii)
             local_ge = self.ge[entrez_id][coord_inds]
             weighted_ge_mean = np.sum(local_ge*weight)/np.sum(weight)
-            ge_for_coord.append(weighted_ge_mean)
+            ge_for_coord = weighted_ge_mean
 
         return ge_for_coord
 
