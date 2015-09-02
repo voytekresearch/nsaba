@@ -244,8 +244,6 @@ class Nsaba(NsabaBase):
                     for temp_coord in temp_coords:
                         term_acts[0, i] = self.coord_to_terms(temp_coord)[term_index]
                         i += 1
-                    print term_acts * weight
-                    print sum(term_acts * weight)
                     term_vector[0, c] = sum(np.squeeze(term_acts * weight))
 
             return term_vector

@@ -41,8 +41,10 @@ class NsabaVisualizer(object):
     def visualize_ns(self, term, no_ids=50):
         """Visualize the neural heat map of a term. no_ids determines how specific the map is"""
         if term in self.no.term:
-            try: len(self.no.ns['id_dict']
-            except KeyError: self.no.ns_load_id_dict()
+            try:
+                len(self.no.ns['id_dict'])
+            except KeyError:
+                self.no.ns_load_id_dict()
             heat = self.no.ns['features_df'][term]
             sorted_heat_vals = sorted(enumerate(heat), key=lambda x: x[1], reverse=True)[0:no_ids]
             weights = zip(*sorted_heat_vals)[1]
