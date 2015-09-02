@@ -68,14 +68,15 @@ class NsabaAnalysis(object):
 
         sam_ids = random.sample(self.no.ge.keys(), sample_num)
         ge_mat = self.no.make_ge_ns_mat(term, sam_ids).T[:-1]
-        aba_sam_num = len(ge_mat[0])
+        term_act_vector = self.no.make_ge_ns_mat(term, sam_ids).T[-1:]
+        loc_num = len(ge_mat[0])
 
         ttest_metrics = {'term': term, "quantile": quant, "gene_sample_size": sample_num}
         gene_stats = []
         for eid, ge in zip(sam_ids, ge_mat):
             # Split coordinates in to term and non-term groups
-            gt_thres = [ge[i] for i in xrange(aba_sam_num) if self.no.term[term]['ns_act_vector'][i] > thres]
-            lt_thres = [ge[i] for i in xrange(aba_sam_num) if self.no.term[term]['ns_act_vector'][i] <= thres]
+            gt_thres = [ge[i] for i in xrange(loc_num) if term_act_vector > thres]
+            lt_thres = [ge[i] for i in xrange(loc_num) if term_act_vector <= thres]
             test_stats = stats.ttest_ind(lt_thres, gt_thres)
             d = cohen_d(lt_thres, gt_thres, len(lt_thres), len(gt_thres))
             # One-sided T-Test

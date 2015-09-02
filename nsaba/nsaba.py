@@ -270,11 +270,11 @@ class Nsaba(NsabaBase):
         set_bucket = []
 
         # Needs work; generalize
-        for i, r in enumerate(range(max_rad, 0, -1)):
+        for i, r in enumerate(xrange(max_rad, 0, -1)):
             pts = coord_tree.query_ball_point(xyz, r)
             set_bucket.append(set(map(tuple, coord_tree.data[pts])))
 
-        for i in range(0, 3):
+        for i in xrange(0, 3):
             sphere_bucket.append(list(set_bucket[i].difference(set_bucket[i + 1])))
         sphere_bucket.append(list(set_bucket[3]))
         rev_iter = reversed(sphere_bucket)
@@ -361,7 +361,7 @@ class Nsaba(NsabaBase):
         if ns_term in self.term and all([key in self.ge for key in entrez_ids]):
             ge_ns_mat = []
             for entrez_id in entrez_ids:
-                aba_indices = np.array([i for i in range(len(self.aba['mni_coords'].data))
+                aba_indices = np.array([i for i in xrange(len(self.aba['mni_coords'].data))
                                         if i not in self.term[ns_term]['aba_void_indices']])
                 ge_ns_mat.append(self.ge[entrez_id][aba_indices])
             ge_ns_mat.append(self.term[ns_term]['ns_act_vector'])
