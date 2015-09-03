@@ -1,7 +1,18 @@
 """
-Contains tools for testing and debugging
-nsaba submodules.
+nsabatools.py
+Contains tools, classes and data structures for nsaba submodules.
 """
+
+
+class ReadOnlyDict(dict):
+    def __init__(self, *args, **kwargs):
+        super(ReadOnlyDict, self).__init__(*args, **kwargs)
+
+    def __setitem__(self, key, value):
+        if key in self.keys():
+            raise UserWarning("Read Only Dictionary")
+        else:
+            super(ReadOnlyDict, self).__setitem__(key, value)
 
 
 # Uses for methods that may be imported and accidentally used.
@@ -12,7 +23,7 @@ def not_operational(func):
 
 
 class preprint(object):
-    def __init__(self, string):
+    def __init__(self, string, verbose):
         self.string = string
 
     def __call__(self, f):
