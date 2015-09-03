@@ -18,7 +18,7 @@ class NsabaVisualizer(object):
         else:
             raise ValueError("NsabaVisualizer() parameter not a Nsaba instance")
     
-    def visualize_ge(self, gene):
+    def visualize_ge(self, gene, alpha=0.4):
         for e in gene:
             if e in self.no.ge:
                 fig = plt.figure()
@@ -27,18 +27,18 @@ class NsabaVisualizer(object):
                 colors = cm.jet(weights/max(weights))
                 color_map = cm.ScalarMappable(cmap=cm.jet)
                 color_map.set_array(weights)
-                # fig.colorbar(color_map)
+                fig.colorbar(color_map)
 
                 x = self.no.aba['mni_coords'].data[:, 0]
                 y = self.no.aba['mni_coords'].data[:, 1]
                 z = self.no.aba['mni_coords'].data[:, 2]
 
-                ax.scatter(x, y, z, c=colors, alpha=0.1)
+                ax.scatter(x, y, z, c=colors, alpha=alpha)
             else:
                 print 'Gene '+str(e) + ' has not been initialized. Use self.no.get_aba_ge([' + str(e) + '])'
         ax.set_title('Gene Expression of gene ID ' + str(gene))
 
-    def visualize_ns(self, term, no_ids=50):
+    def visualize_ns(self, term, no_ids=10, alpha=0.2):
         """Visualize the neural heat map of a term. no_ids determines how specific the map is"""
         if term in self.no.term:
             try:
@@ -68,16 +68,17 @@ class NsabaVisualizer(object):
                     new_weights.append(weights[wc])
             fig = plt.figure()
             ax = fig.add_subplot(111, projection='3d')
-            colors = cm.jet(weights/max(weights))
+            colors = cm.jet(new_weights/max(new_weights))
             color_map = cm.ScalarMappable(cmap=cm.jet)
-            color_map.set_array(weights)
+            color_map.set_array(new_weights)
             fig.colorbar(color_map)
-            ax.scatter(xvals, yvals, zvals, c=colors, alpha=0.1)
+            ax.scatter(xvals, yvals, zvals, c=colors, alpha=alpha)
             ax.set_title('Heat map of ' + str(term))
         else:
             print 'Term '+term + ' has not been initialized. Use self.no.get_ns_act(' + term + ',thresh = 0.01)'
 
     @not_operational
+    # uses random coords instead of most active coords
     def visualize_ns_old(self, term, points=200):
         if term in self.no.term:
             term_index = self.no.ns['features_df'].columns.get_loc(term)

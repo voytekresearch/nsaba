@@ -42,13 +42,13 @@ class NsabaAnalysis(object):
         print "t-value: %.4f \np-value: %.3E" % stats.ttest_ind(lt_thres, gt_thres)
         print "Effect size: %.4f \n" % cohen_d(lt_thres, gt_thres, len(lt_thres), len(gt_thres))
         # Histogram/KDE Plots
-        ax = plt.axes();
-        ax.set_title('Gene Expression Distributions');
-        ax.set_xlabel('gene expression');
-        ax.set_ylabel('density');
-        sns.distplot(gt_thres, ax=ax, label=term);
-        sns.distplot(lt_thres, label='null');
-        plt.legend();
+        ax = plt.axes()
+        ax.set_title('Gene Expression Distributions')
+        ax.set_xlabel('gene expression')
+        ax.set_ylabel('density')
+        sns.distplot(gt_thres, ax=ax, label=term)
+        sns.distplot(lt_thres, label='null')
+        plt.legend()
 
     @preprint('This may take a couple of minutes ...')
     def t_test_multi(self, term, quant=None, sample_num=None):
