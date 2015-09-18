@@ -77,8 +77,7 @@ class NsabaVisualizer(object):
         else:
             print 'Term '+term + ' has not been initialized. Use self.no.get_ns_act(' + term + ',thresh = 0.01)'
 
-    @not_operational
-    # uses random coords instead of most active coords
+    @not_operational # uses random coords instead of most active coords
     def visualize_ns_old(self, term, points=200):
         if term in self.no.term:
             term_index = self.no.ns['features_df'].columns.get_loc(term)
