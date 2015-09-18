@@ -29,7 +29,7 @@ class NsabaAnalysis(object):
         self.gene_rec = collections.namedtuple("gene_rec", "entrez cohen_d p_value")
         print "To use inline plotting functionality in Jupyter, '%matplotlib inline' must be enabled"
 
-    def t_test(self, term, gene, quant=None):
+    def t_test(self, term, gene, quant=None, log=False, graphops='density'):
         """ T-Test of gene expression between term and non-term coordinates"""
         if not quant:
             quant = 85
@@ -38,20 +38,41 @@ class NsabaAnalysis(object):
         # Splitting groups
         gt_thres = [row[0] for row in analmat if row[1] > thres]
         lt_thres = [row[0] for row in analmat if row[1] <= thres]
+        if log:
+            gt_thres= np.log(gt_thres)
+            lt_thres= np.log(lt_thres)
+
         # T-Test
         print "t-value: %.4f \np-value: %.3E" % stats.ttest_ind(lt_thres, gt_thres)
         print "Effect size: %.4f \n" % cohen_d(lt_thres, gt_thres, len(lt_thres), len(gt_thres))
         # Histogram/KDE Plots
-        ax = plt.axes()
-        ax.set_title('Gene Expression Distributions')
-        ax.set_xlabel('gene expression')
-        ax.set_ylabel('density')
-        sns.distplot(gt_thres, ax=ax, label=term)
-        sns.distplot(lt_thres, label='null')
-        plt.legend()
+        if graphops == 'density':
+            ax = plt.axes()
+            ax.set_title('Gene Expression Distributions')
+            ax.set_xlabel('gene expression')
+            ax.set_ylabel('density')
+            sns.distplot(gt_thres, ax=ax, label=term)
+            sns.distplot(lt_thres, label='null')
+            plt.legend()
+        elif graphops == 'box':
+            ax = plt.axes()
+            ax.boxplot([lt_thres, gt_thres])
+            ax.set_xticks([1, 2])
+            ax.set_xticklabels(['Low '+term, 'High '+term])
+        elif graphops == 'violin':
+            ax = plt.axes()
+            ax.violinplot([lt_thres, gt_thres])
+            ax.set_xticks([1, 2])
+            ax.set_xticklabels(['Low '+term, 'High '+term])
+            ax.set_ylabel('Gene Expression')
+            ax.plot(np.ones(len(lt_thres)), lt_thres, 'b.')
+            ax.plot(1, np.mean(lt_thres), 'bs')
+            ax.plot(2*np.ones(len(gt_thres)), gt_thres, 'g.')
+            ax.plot(2, np.mean(gt_thres), 'gs')
+
 
     @preprint('This may take a couple of minutes ...')
-    def t_test_multi(self, term, quant=None, sample_num=None):
+    def t_test_multi(self, term, quant=None, sample_num=None, genes_of_interest=[]):
         if term not in self.no.term:
             raise ValueError("Term activation not generated for '%s" % term)
         if not sample_num:
@@ -65,7 +86,6 @@ class NsabaAnalysis(object):
 
         if len(self.no.ge) < sample_num:
             raise ValueError("Sample number exceeds stored number of Entrez IDs")
-
         sam_ids = random.sample(self.no.ge.keys(), sample_num)
         ge_mat = self.no.make_ge_ns_mat(term, sam_ids).T[:-1]
         term_act_vector = self.no.make_ge_ns_mat(term, sam_ids).T[-1:]
@@ -75,8 +95,9 @@ class NsabaAnalysis(object):
         gene_stats = []
         for eid, ge in zip(sam_ids, ge_mat):
             # Split coordinates in to term and non-term groups
-            gt_thres = [ge[i] for i in xrange(loc_num) if term_act_vector > thres]
-            lt_thres = [ge[i] for i in xrange(loc_num) if term_act_vector <= thres]
+            #print term_act_vector
+            gt_thres = [ge[i] for i in xrange(loc_num) if term_act_vector[0][i] > thres]
+            lt_thres = [ge[i] for i in xrange(loc_num) if term_act_vector[0][i] <= thres]
             test_stats = stats.ttest_ind(lt_thres, gt_thres)
             d = cohen_d(lt_thres, gt_thres, len(lt_thres), len(gt_thres))
             # One-sided T-Test
@@ -84,6 +105,8 @@ class NsabaAnalysis(object):
                 gene_stats.append(self.gene_rec(eid, d, test_stats[1]))
             else:
                 continue
+            if eid in genes_of_interest:
+                print 'Gene: ' + str(eid) + '  Effect Size: '+str(d)
 
         # Sort effect sizes from greatest to smallest in magnitude
         gene_stats.sort(key=lambda rec: rec.cohen_d)
@@ -114,15 +137,23 @@ class NsabaAnalysis(object):
         sig = sum((p < .05/float(ttest_metrics['gene_sample_size']) for p in p_vals))
         print "Percent Significant (Bonferroni Correction; alpha = .05): %.3f %%" % \
               (100*sig/float(ttest_metrics['gene_sample_size']))
-        plt.hist(p_vals, bins=75);
-        plt.title('P-value Distribution');
-        plt.xlabel('p-values');
-        plt.ylabel('frequency');
+        plt.hist(p_vals, bins=75)
+        plt.title('P-value Distribution')
+        plt.xlabel('p-values')
+        plt.ylabel('frequency')
 
-    def effect_size_distr(self, ttest_metrics):
+    def effect_size_distr(self, ttest_metrics, genes_of_interest=[]):
         """Visualizing effect-size distribution"""
         d_vals = [rec.cohen_d for rec in ttest_metrics['results']]
-        plt.hist(d_vals, bins=75);
-        plt.title("Effect Size Distribution (Cohen's d)");
-        plt.xlabel('effect sizes');
-        plt.ylabel('frequency');
+        plt.hist(d_vals, bins=75)
+        plt.title("Effect Size Distribution (Cohen's d)")
+        plt.xlabel('effect sizes')
+        plt.ylabel('frequency')
+
+        offsetter = 300/len(genes_of_interest)
+        for rec in ttest_metrics['results']:
+            if int(rec.entrez) in genes_of_interest:
+                plt.plot([rec.cohen_d, rec.cohen_d], [0, offsetter])
+                plt.annotate('Gene:'+str(int(rec.entrez))+' d='+str(rec.cohen_d),
+                             [rec.cohen_d, offsetter])
+                offsetter += offsetter

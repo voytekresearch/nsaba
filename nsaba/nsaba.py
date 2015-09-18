@@ -112,6 +112,7 @@ class NsabaBase(object):
             if val is None:
                 raise NotImplementedError("Unassigned Nsaba 'ns' static variable: see Nsaba.ns_load(path)")
 
+
 class Nsaba(NsabaBase):
     """ Main Nsaba class. Contains methods data fetching, estimation and organization."""
 
