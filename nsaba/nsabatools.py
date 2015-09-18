@@ -23,7 +23,7 @@ def not_operational(func):
 
 
 class preprint(object):
-    def __init__(self, string, verbose):
+    def __init__(self, string):
         self.string = string
 
     def __call__(self, f):
