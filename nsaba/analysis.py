@@ -5,13 +5,15 @@ Author: Simon Haxby
 """
 from nsaba import Nsaba
 from nsabatools import preprint
-from geneinfo import gene_info
+from geneinfo import gene_info, gene_id
 import random
 import collections
 from scipy import stats
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+import csv
+from time import sleep
 
 
 def cohen_d(x1, x2, n1, n2):
@@ -115,21 +117,24 @@ class NsabaAnalysis(object):
         return ttest_metrics
 
     @preprint('Fetching NIH gene descriptions ...')
-    def fetch_gene_descriptions(self, ttest_metrics, nih_fetch_num=20, alpha=.05):
+    def fetch_gene_descriptions(self, ttest_metrics, nih_fetch_num=20, alpha=.05, printme=True):
         """Prints: ID, p-value, Cohen's d, gene description for genes with the largest effect sizes"""
         top_genes = []
         for rec in ttest_metrics['results'][:nih_fetch_num]:
+            sleep(.5)
             try:
-                top_genes.append((rec.entrez, rec.cohen_d, rec.p_value, gene_info(str(int(rec.entrez)))[0]))
+                top_genes.append((rec.entrez, rec.cohen_d, rec.p_value, gene_id(str(int(rec.entrez))), gene_info(str(int(rec.entrez)))[0]))
             except TypeError:
                 continue
 
-        print "\nCorrected Bonferroni Alpha: %.3E\n\n" % (alpha/float(ttest_metrics['gene_sample_size']))
-        for eid, coh_d, p_val, descr in top_genes:
-            if len(descr) == 1:
-                print "%d (p = %.3E; d = %.3f): < No description found >\n\n" % (eid, p_val, coh_d)
-            else:
-                print "%d (p = %.3E; d = %.3f): %s\n\n" % (eid, p_val, coh_d, descr)
+        if printme:
+            print "\nCorrected Bonferroni Alpha: %.3E\n\n" % (alpha/float(ttest_metrics['gene_sample_size']))
+            for eid, coh_d, p_val, gene_i, descr in top_genes:
+                if len(descr) == 1:
+                    print "%d (p = %.3E; d = %.3f): < No description found >\n\n" % (eid, p_val, coh_d)
+                else:
+                    print "%d (p = %.3E; d = %.3f): %s\n\n" % (eid, p_val, coh_d, descr)
+        return top_genes
 
     def p_val_distr(self, ttest_metrics):
         """Visualizing p-value distribution"""
@@ -142,18 +147,35 @@ class NsabaAnalysis(object):
         plt.xlabel('p-values')
         plt.ylabel('frequency')
 
-    def effect_size_distr(self, ttest_metrics, genes_of_interest=[]):
+    def effect_size_distr(self, ttest_metrics, genes_of_interest=[], return_fig=False):
         """Visualizing effect-size distribution"""
         d_vals = [rec.cohen_d for rec in ttest_metrics['results']]
-        plt.hist(d_vals, bins=75)
-        plt.title("Effect Size Distribution (Cohen's d)")
-        plt.xlabel('effect sizes')
-        plt.ylabel('frequency')
+        ax = plt.axes()
+        ax.hist(d_vals, bins=75)
+        ax.set_title("Effect Size Distribution (Cohen's d)")
+        ax.set_xlabel('effect sizes')
+        ax.set_ylabel('frequency')
 
-        offsetter = 300/len(genes_of_interest)
+        offsetter = 450/len(genes_of_interest)
         for rec in ttest_metrics['results']:
             if int(rec.entrez) in genes_of_interest:
                 plt.plot([rec.cohen_d, rec.cohen_d], [0, offsetter])
                 plt.annotate('Gene:'+str(int(rec.entrez))+' d='+str(rec.cohen_d),
                              [rec.cohen_d, offsetter])
-                offsetter += offsetter
+                offsetter += 450/len(genes_of_interest)
+        if return_fig:
+            return ax
+
+    def save_results(self, ttest_metrics, direct, fname=None, no_genes=20):
+        if fname is None:
+            fname = 'nsaba_output_figure'
+
+        top_genes = self.fetch_gene_descriptions(ttest_metrics, nih_fetch_num=no_genes, printme=False)
+        eids = [int(i[0]) for i in top_genes]
+        myfig = self.effect_size_distr(ttest_metrics, genes_of_interest=eids[0:20], return_fig=True)
+        plt.savefig(direct+fname+'.png')
+
+        with open(direct+fname+'.csv', 'wb') as csvfile:
+            writer = csv.writer(csvfile)
+            for i in top_genes:
+                writer.writerow([i[0], i[3], i[1], i[2], i[4]])
