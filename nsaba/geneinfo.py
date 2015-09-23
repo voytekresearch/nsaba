@@ -1,5 +1,8 @@
 import urllib2
 from bs4 import BeautifulSoup
+from time import sleep
+from random import random
+
 
 def gene_info(eid):
     """Pulls gene data based on Entrez ID from the NIH and returns summary"""
@@ -7,6 +10,7 @@ def gene_info(eid):
         try:
             page_name = "http://www.ncbi.nlm.nih.gov/gene/?term=" + eid
             page = urllib2.urlopen(page_name)
+            sleep(1+random(1))
             soup = BeautifulSoup(page)
             contents = []
             for ana in soup.findAll('dd'):
@@ -25,6 +29,7 @@ def gene_id(eid):
         try:
             page_name = "http://www.ncbi.nlm.nih.gov/gene/?term=" + eid
             page = urllib2.urlopen(page_name)
+            sleep(1+random(1))
             soup = BeautifulSoup(page)
             contents = []
             for ana in soup.findAll('dd'):

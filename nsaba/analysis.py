@@ -4,7 +4,7 @@ Statistical testing and analysis tools for Nsaba.
 Author: Simon Haxby
 """
 from nsaba import Nsaba
-from nsabatools import preprint
+from nsabatools import preprint, not_operational
 from geneinfo import gene_info, gene_id
 import random
 import collections
@@ -13,7 +13,6 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 import csv
-from time import sleep
 
 
 def cohen_d(x1, x2, n1, n2):
@@ -71,6 +70,86 @@ class NsabaAnalysis(object):
             ax.plot(1, np.mean(lt_thres), 'bs')
             ax.plot(2*np.ones(len(gt_thres)), gt_thres, 'g.')
             ax.plot(2, np.mean(gt_thres), 'gs')
+
+    # @not_operational
+    def t_test_custom_ge(self, coords1, coords2, gene, quant=None, log=False, graphops='density'):
+        """ T-Test of gene expression between term and non-term coordinates"""
+        if not quant:
+            quant = 85
+        ge1 = self.no.coords_to_ge(coords1, [gene])
+        ge2 = self.no.coords_to_ge(coords2, [gene])
+
+        if log:
+            ge1 = np.log(ge1)
+            ge2 = np.log(ge2)
+
+        # T-Test
+        print "t-value: %.4f \np-value: %.3E" % stats.ttest_ind(ge1, ge2)
+        print "Effect size: %.4f \n" % cohen_d(ge1, ge2, len(ge1), len(ge2))
+        # Histogram/KDE Plots
+        if graphops == 'density':
+            ax = plt.axes()
+            ax.set_title('Gene Expression Distributions')
+            ax.set_xlabel('gene expression')
+            ax.set_ylabel('density')
+            sns.distplot(ge1, ax=ax, label='coordinate list 1')
+            sns.distplot(ge2, label='coordinate list 2')
+            plt.legend()
+        elif graphops == 'box':
+            ax = plt.axes()
+            ax.boxplot([ge1, ge2])
+            ax.set_xticks([1, 2])
+            ax.set_xticklabels(['coordinate list 1', 'coordinate list 2'])
+        elif graphops == 'violin':
+            ax = plt.axes()
+            ax.violinplot([ge1, ge2])
+            ax.set_xticks([1, 2])
+            ax.set_xticklabels(['coordinate list 1', 'coordinate list 2'])
+            ax.set_ylabel('Gene Expression')
+            ax.plot(np.ones(len(ge1)), ge1, 'b.')
+            ax.plot(1, np.mean(ge1), 'bs')
+            ax.plot(2*np.ones(len(ge2)), ge2, 'g.')
+            ax.plot(2, np.mean(ge2), 'gs')
+
+    # @not_operational
+    def t_test_custom_term(self, coords1, coords2, term, quant=None, log=False, graphops='density'):
+        """ T-Test of gene expression between term and non-term coordinates"""
+        if not quant:
+            quant = 85
+        term1 = self.no.coords_to_term(coords1, term)
+        term2 = self.no.coords_to_term(coords2, term)
+
+        if log:
+            term1 = np.log(term1)
+            term2 = np.log(term2)
+
+        # T-Test
+        print "t-value: %.4f \np-value: %.3E" % stats.ttest_ind(term1, term2)
+        print "Effect size: %.4f \n" % cohen_d(term1, term2, len(term1), len(term2))
+        # Histogram/KDE Plots
+        if graphops == 'density':
+            ax = plt.axes()
+            ax.set_title(term + ' Distributions')
+            ax.set_xlabel(term)
+            ax.set_ylabel('density')
+            sns.distplot(term1, ax=ax, label='coordinate list 1')
+            sns.distplot(term2, label='coordinate list 2')
+            plt.legend()
+        elif graphops == 'box':
+            ax = plt.axes()
+            ax.boxplot([term1, term2])
+            ax.set_xticks([1, 2])
+            ax.set_xticklabels(['coordinate list 1', 'coordinate list 2'])
+        elif graphops == 'violin':
+            ax = plt.axes()
+            ax.violinplot([term1, term2])
+            ax.set_xticks([1, 2])
+            ax.set_xticklabels(['coordinate list 1', 'coordinate list 2'])
+            ax.set_ylabel(term)
+            ax.plot(np.ones(len(term1)), term1, 'b.')
+            ax.plot(1, np.mean(term1), 'bs')
+            ax.plot(2*np.ones(len(term2)), term2, 'g.')
+            ax.plot(2, np.mean(term2), 'gs')
 
 
     @preprint('This may take a couple of minutes ...')

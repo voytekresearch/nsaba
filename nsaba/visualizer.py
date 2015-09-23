@@ -103,12 +103,26 @@ class NsabaVisualizer(object):
         ax.scatter(x, y, z, c=colors, alpha=0.4)
         ax.set_title('Estimation of ' + term)
 
+    def visualize_ge_ns(self, gene, term, logy=False, logx=False):
+        # lol bonus method
+        self.visualize_ns_ge(self, term, gene, logy=logy, logx=logx)
 
-    def visualize_ns_ge(self, term, gene):
+    def visualize_ns_ge(self, term, gene, logy=False, logx=False, only_term=False):
         for g in gene:
             if g in self.no.ge:
                 if term in self.no.term:
                     ge_ns_mat = self.no.make_ge_ns_mat(term, gene)
+                    if only_term:
+                        if ge_ns_mat.shape[0] > 900:  # check this num later
+                            print 'reinitializing ' + term + ' for hacky plotting method'
+                            self.no.get_ns_act(term, thresh=0, method='knn')
+                            ge_ns_mat = self.no.make_ge_ns_mat(term, gene)
+                    fig = plt.figure()
+                    ax = fig.add_subplot(111)
+                    if logy:
+                        ax.set_yscale('log')
+                    if logx:
+                        ax.set_xscale('log')
 
                     # correlation
                     correlation = np.corrcoef(ge_ns_mat[:, 0], ge_ns_mat[:, 1])
@@ -120,19 +134,19 @@ class NsabaVisualizer(object):
                     # print 'Correlation between ' + term + ' and gene number ' + str(gene)
                     # print correlation
                     # print 'Linear regression between ' + term + ' and gene number ' + str(gene) +' Slope =' + str(m) + ' y intercept = '+ str(c)
-                    fig = plt.figure()
-                    ax = fig.add_subplot(111)
-                    plt.plot(ge_ns_mat[:, 0], ge_ns_mat[:, 1], '.')
-                    plt.plot([min(ge_ns_mat[:, 0]), max(ge_ns_mat[:, 0])], [m*min(ge_ns_mat[:, 0])+c, m*max(ge_ns_mat[:, 0])+c], 'r')
+
+                    ax.plot(ge_ns_mat[:, 0], ge_ns_mat[:, 1], '.')
+                    ax.plot([min(ge_ns_mat[:, 0]), max(ge_ns_mat[:, 0])], [m*min(ge_ns_mat[:, 0])+c, m*max(ge_ns_mat[:, 0])+c], 'r')
                     ax.set_xlabel(str(gene))
                     ax.set_ylabel(term)
+
                     return correlation, [m, c]
                 else:
                     print 'Term '+term + ' has not been initialized. Use self.no.get_ns_act(' + term + ',thresh = 0.01)'
             else:
                 print 'Gene '+str(g) + ' has not been initialized. Use self.no.get_aba_ge([' + str(g) + '])'
 
-    def visualize_ns_ns(self, term1, term2):
+    def visualize_ns_ns(self, term1, term2, logy=False, logx=False):
         """Visualizing the relationship between two term vectors"""
         if term1 in self.no.term:
             if term2 in self.no.term:
@@ -145,15 +159,19 @@ class NsabaVisualizer(object):
                 # plotting
                 fig = plt.figure()
                 ax = fig.add_subplot(111)
-                plt.plot(self.no.term[term1]['ns_act_vector'], self.no.term[term2]['ns_act_vector'], '.')
-                plt.plot([min(self.no.term[term1]['ns_act_vector']), max(self.no.term[term1]['ns_act_vector'])], [m*min(self.no.term[term2]['ns_act_vector'])+c, m*max(self.no.term[term2]['ns_act_vector'])+c], 'r')
+                if logy:
+                    ax.set_yscale('log')
+                if logx:
+                    ax.set_xscale('log')
+                ax.plot(self.no.term[term1]['ns_act_vector'], self.no.term[term2]['ns_act_vector'], '.')
+                ax.plot([min(self.no.term[term1]['ns_act_vector']), max(self.no.term[term1]['ns_act_vector'])], [m*min(self.no.term[term2]['ns_act_vector'])+c, m*max(self.no.term[term2]['ns_act_vector'])+c], 'r')
                 ax.set_xlabel(term1)
                 ax.set_ylabel(term2)
                 return correlation, [m, c]
             else:
-                print 'Term '+term2 + ' has not been initialized. Use self.no.get_ns_act(' + term2 + ',thresh = 0.01)'
+                print 'Term '+term2 + ' has not been initialized. Use self.no.get_ns_act(' + term2 + ',thresh = -1)'
         else:
-            print 'Term '+term1 + ' has not been initialized. Use self.no.get_ns_act(' + term1 + ',thresh = 0.01)'
+            print 'Term '+term1 + ' has not been initialized. Use self.no.get_ns_act(' + term1 + ',thresh = -1)'
 
     def visualize_ge_ge(self, genes):
         """Visualizing two gene vectors"""

@@ -243,13 +243,12 @@ class Nsaba(NsabaBase):
                     r, inds = self.ns['mni_coords'].query(coord, search_radii)
                     temp_coords = self.ns['mni_coords'].data[inds]
                     weight = 1./r**2
-                    term_acts = np.zeros((1, len(temp_coords)))
-                    i = 0
-                    for temp_coord in temp_coords:
-                        term_acts[0, i] = self.coord_to_terms(np.floor(temp_coord))[term_index]
-                        i += 1
-                    term_vector[0, c] = sum(np.squeeze(term_acts * weight))
+                    term_acts = []
 
+                    for temp_coord in temp_coords:
+                        term_act = self.coord_to_terms(np.floor(temp_coord))[term_index]
+                        if term_act > 0:
+                            term_acts.append(sum(np.squeeze(term_acts * weight)))
             return term_vector
         else:
             raise TypeError("'%s' is not a valid term." % term)
@@ -354,7 +353,7 @@ class Nsaba(NsabaBase):
                 self.term[term]['ns_act_vector'].append(act_coeff)
 
     def get_ns_act(self, term, thresh=-1, method='knn', search_radii=3, k=None):
-        """Generates NS activation vector about ABA MNI coordinates  """
+        """Generates NS activation vector about ABA MNI coordinates  timed at 26.1 s"""
         if not self.is_term(term):
             raise ValueError("'%s' is not a registered term." % term)
 
@@ -417,7 +416,8 @@ class Nsaba(NsabaBase):
         ge_for_coords = []
         for coord in coords:
             ge_for_coord = self._coord_to_ge(coord, entrez_ids, search_radii, k)
-            ge_for_coords.append(ge_for_coord)
+            if ge_for_coords > 0:
+                ge_for_coords.append(ge_for_coord)
 
         return np.array(ge_for_coords)
 
