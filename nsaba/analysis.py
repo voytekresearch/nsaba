@@ -5,7 +5,7 @@ Author: Simon Haxby
 """
 from nsaba import Nsaba
 from nsabatools import preprint, not_operational
-from geneinfo import gene_info, gene_id
+from geneinfo import gene_info
 import random
 import collections
 from scipy import stats
@@ -202,7 +202,8 @@ class NsabaAnalysis(object):
         for rec in ttest_metrics['results'][:nih_fetch_num]:
             sleep(.5)
             try:
-                top_genes.append((rec.entrez, rec.cohen_d, rec.p_value, gene_id(str(int(rec.entrez))), gene_info(str(int(rec.entrez)))[0]))
+                gene_name, gene_description = gene_info(str(int(rec.entrez)))
+                top_genes.append((rec.entrez, rec.cohen_d, rec.p_value, gene_name, gene_description))
             except TypeError:
                 continue
 
