@@ -13,6 +13,7 @@ import itertools
 import numpy as np
 import pandas as pd
 from scipy import spatial
+from scipy.signal import gaussian
 
 from nsabatools import not_operational, preprint
 
@@ -318,12 +319,16 @@ class Nsaba(NsabaBase):
         return np.array(bucket_act_vec)*weight
 
     @preprint('This may take a few minutes...')
-    def _knn_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii, k):
+    def _knn_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii, k, weighting='gaussian'):
         """KNN method """
         for irow, xyz in enumerate(self.aba['mni_coords'].data):
             coord_inds, radii = self._knn_search(xyz, ns_coord_tree, search_radii, k)
             coords = ns_coord_tree.data[coord_inds]
-            weight = self.__ns_weight_f(radii)
+            if weighting == 'gaussian':
+                gaussian_window = gaussian(len(radii)*2+1, std=2)  # std 2 is arbitrary but looks nice
+                weight = [gaussian_window[r+len(radii)-1] for r in radii]
+            else:
+                weight = self.__ns_weight_f(radii)
             weighted_means = self._get_act_values(coords, weight, term, ns_coord_act_df)
             if len(weighted_means) == 0:
                 self.term[term]['aba_void_indices'].append(irow)
@@ -332,13 +337,17 @@ class Nsaba(NsabaBase):
                 self.term[term]['ns_act_vector'].append(act_coeff)
 
     @preprint('This may take a few minutes...')
-    def _sphere_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii):
+    def _sphere_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii, weighting='gaussian'):
         """Sphere buckets method"""
         for irow, xyz in enumerate(self.aba['mni_coords'].data):
             sphere_bucket = self._sphere(xyz, ns_coord_tree, search_radii)
             sphere_vals = [0, 0]
             for w, bucket in enumerate(sphere_bucket):
-                weight = self.__ns_weight_f(w + 1)
+                if weighting == 'gaussian':
+                    gaussian_window = gaussian(len(w)*2+1, std=2)  # std 2 is arbitrary but looks nice
+                    weight = [gaussian_window[r+len(w)-1] for r in w]
+                else:
+                    weight = self.__ns_weight_f(w + 1)
                 bucket_mean = np.mean(self._get_act_values(bucket, weight, term, ns_coord_act_df))
                 if np.isnan(bucket_mean):
                     sphere_vals[0] += 0
