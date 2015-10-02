@@ -36,7 +36,7 @@ class NsabaBase(object):
 
     @classmethod
     @preprint('This may take a minute or two ...')
-    def aba_load(cls, aba_path=".", csv_names=None):
+    def aba_load(cls, aba_root=".", aba_files=['normalized_microarray_donor9861'], csv_names=None):
         """Initialization of 'aba' dictionary"""
 
         if not csv_names:
@@ -48,21 +48,39 @@ class NsabaBase(object):
         if len(csv_names) != 3:
             raise IndexError("'csv_names' must a list of 3 'str' variables")
 
-        csv_path = os.path.join(aba_path, csv_names[1])
-        cls.aba['si_df'] = pd.read_csv(csv_path)
-        print '%s loaded.' % csv_names[1]
+        for aba_file in aba_files:
+            print 'initializing gene data from %s' % aba_file
+            aba_path = aba_root+aba_file
+            csv_path = os.path.join(aba_path, csv_names[1])
+            try:
+                len(cls.aba['si_df'])
+                cls.aba['si_df'].append(pd.read_csv(csv_path))
+                print '%s appended.' % csv_names[1]
+            except TypeError:
+                cls.aba['si_df'] = pd.read_csv(csv_path)
+                print '%s loaded.' % csv_names[1]
 
-        csv_path = os.path.join(aba_path, csv_names[0])
-        cls.aba['exp_df'] = pd.read_csv(csv_path, header=None)
-        cls.aba['exp_df'].columns = list(
-            itertools.chain.from_iterable(
-                [['probe_id'], range(cls.aba['si_df'].shape[0])]))
+            csv_path = os.path.join(aba_path, csv_names[0])
+            try:
+                len(cls.aba['exp_df'])
+                cls.aba['exp_df'].append(pd.read_csv(csv_path, header=None))
+                print '%s appended.' % csv_names[0]
+            except TypeError:
+                cls.aba['exp_df'] = pd.read_csv(csv_path, header=None)
+                print '%s loaded.' % csv_names[0]
 
-        print '%s loaded.' % csv_names[0]
+            cls.aba['exp_df'].columns = list(
+                itertools.chain.from_iterable(
+                    [['probe_id'], range(cls.aba['si_df'].shape[0])]))
 
-        csv_path = os.path.join(aba_path, csv_names[2])
-        cls.aba['probe_df'] = pd.read_csv(csv_path)
-        print '%s loaded.' % csv_names[2]
+            csv_path = os.path.join(aba_path, csv_names[2])
+            try:
+                len(cls.aba['probe_df'])
+                cls.aba['probe_df'].append(pd.read_csv(csv_path))
+                print '%s appended.' % csv_names[2]
+            except TypeError:
+                cls.aba['probe_df'] = pd.read_csv(csv_path)
+                print '%s loaded.' % csv_names[2]
 
         mni_coords = cls.aba['si_df'].loc[:, 'mni_x':'mni_z'].as_matrix().astype(float)
         cls.aba['mni_coords'] = spatial.KDTree(mni_coords)
@@ -319,12 +337,12 @@ class Nsaba(NsabaBase):
         return np.array(bucket_act_vec)*weight
 
     @preprint('This may take a few minutes...')
-    def _knn_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii, k, weighting='gaussian'):
+    def _knn_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii, k, smoothing= 'gaussian'):
         """KNN method """
         for irow, xyz in enumerate(self.aba['mni_coords'].data):
             coord_inds, radii = self._knn_search(xyz, ns_coord_tree, search_radii, k)
             coords = ns_coord_tree.data[coord_inds]
-            if weighting == 'gaussian':
+            if smoothing == 'gaussian':
                 gaussian_window = gaussian(len(radii)*2+1, std=2)  # std 2 is arbitrary but looks nice
                 weight = [gaussian_window[r+len(radii)-1] for r in radii]
             else:
@@ -337,13 +355,13 @@ class Nsaba(NsabaBase):
                 self.term[term]['ns_act_vector'].append(act_coeff)
 
     @preprint('This may take a few minutes...')
-    def _sphere_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii, weighting='gaussian'):
+    def _sphere_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii, smoothing='gaussian'):
         """Sphere buckets method"""
         for irow, xyz in enumerate(self.aba['mni_coords'].data):
             sphere_bucket = self._sphere(xyz, ns_coord_tree, search_radii)
             sphere_vals = [0, 0]
             for w, bucket in enumerate(sphere_bucket):
-                if weighting == 'gaussian':
+                if smoothing == 'gaussian':
                     gaussian_window = gaussian(len(w)*2+1, std=2)  # std 2 is arbitrary but looks nice
                     weight = [gaussian_window[r+len(w)-1] for r in w]
                 else:
@@ -361,7 +379,7 @@ class Nsaba(NsabaBase):
                 act_coeff = sphere_vals[0] / sphere_vals[1]
                 self.term[term]['ns_act_vector'].append(act_coeff)
 
-    def get_ns_act(self, term, thresh=-1, method='knn', search_radii=3, k=None):
+    def get_ns_act(self, term, thresh=-1, method='knn', smoothing='gaussian', search_radii=3, k=None):
         """Generates NS activation vector about ABA MNI coordinates  timed at 26.1 s"""
         if not self.is_term(term):
             raise ValueError("'%s' is not a registered term." % term)
@@ -375,7 +393,7 @@ class Nsaba(NsabaBase):
         if method == 'knn':
             if k is None:
                 k = 20
-            self._knn_method(term, ns_coord_act_df, ns_coord_tree, search_radii, k)
+            self._knn_method(term, ns_coord_act_df, ns_coord_tree, search_radii, k, smoothing=smoothing)
         elif method == 'sphere':
             if k is not None:
                 raise ValueError("'k' parameter cannot be used with 'sphere' method.")
