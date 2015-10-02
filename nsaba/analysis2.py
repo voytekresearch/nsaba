@@ -33,13 +33,13 @@ class NsabaAnalysis2(object):
         ax.set_ylabel('count')
 
         if genes_of_interest:
-            offsetter = 450/len(genes_of_interest)
+            offsetter = 1000/len(genes_of_interest)
             for r in xrange(len(r_values)):
                 if self.no.ge.keys()[r] in genes_of_interest:
                     plt.plot([r_values[r], r_values[r]], [0, offsetter])
-                    plt.annotate('Gene:'+str(self.no.ge.keys()[r])+' d='+str(r_values[r]),
+                    plt.annotate('Gene:'+str(self.no.ge.keys()[r])+' rho='+str(r_values[r]),
                                  [r_values[r], offsetter])
-                    offsetter += 450/len(genes_of_interest)
+                    offsetter += 1000/len(genes_of_interest)
 
     def fetch_gene_descriptions(self, r_values, nih_fetch_num=20, alpha=.05, printme=True):
         """Prints: ID, spearman's r, gene name, and gene description for genes with the largest effect sizes"""
