@@ -6,7 +6,6 @@ Author: Simon Haxby
 from nsaba import Nsaba
 from nsaba import get_gene_info
 from nsabatools import preprint, not_operational
-from geneinfo import gene_info
 import random
 import collections
 from scipy import stats
@@ -197,13 +196,13 @@ class NsabaAnalysis(object):
         return ttest_metrics
 
     @preprint('Fetching NIH gene descriptions ...')
-    def fetch_gene_descriptions(self, ttest_metrics, nih_fetch_num=20, alpha=.05, printme=True):
+    def fetch_gene_descriptions(self, ttest_metrics, gene_path='.', nih_fetch_num=20, alpha=.05, printme=True):
         """Prints: ID, p-value, Cohen's d, gene description for genes with the largest effect sizes"""
         top_genes = []
         for rec in ttest_metrics['results'][:nih_fetch_num]:
             sleep(.5)
             try:
-                gene_dat = get_gene_info(str(int(rec.entrez)))
+                gene_dat = get_gene_info(gene_path, str(int(rec.entrez)))
                 gene_name = gene_dat[1]
                 gene_description = gene_dat[2]
                 top_genes.append((rec.entrez, rec.cohen_d, rec.p_value, gene_name, gene_description))
