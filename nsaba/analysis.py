@@ -4,6 +4,7 @@ Statistical testing and analysis tools for Nsaba.
 Author: Simon Haxby
 """
 from nsaba import Nsaba
+from nsaba import get_gene_info
 from nsabatools import preprint, not_operational
 from geneinfo import gene_info
 import random
@@ -202,7 +203,9 @@ class NsabaAnalysis(object):
         for rec in ttest_metrics['results'][:nih_fetch_num]:
             sleep(.5)
             try:
-                gene_name, gene_description = gene_info(str(int(rec.entrez)))
+                gene_dat = get_gene_info(str(int(rec.entrez)))
+                gene_name = gene_dat[1]
+                gene_description = gene_dat[2]
                 top_genes.append((rec.entrez, rec.cohen_d, rec.p_value, gene_name, gene_description))
             except TypeError:
                 continue
