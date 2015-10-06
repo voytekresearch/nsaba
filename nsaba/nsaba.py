@@ -48,9 +48,14 @@ class NsabaBase(object):
         if len(csv_names) != 3:
             raise IndexError("'csv_names' must a list of 3 'str' variables")
 
+
         for aba_file in aba_files:
-            print 'initializing gene data from %s' % aba_file
-            aba_path = aba_root+aba_file
+            print 'Initializing gene data from %s' % aba_file
+            ## fucking digusting hack
+            if aba_file == 'null':
+                aba_path = aba_root
+            else:
+                aba_path = aba_root+aba_file
             csv_path = os.path.join(aba_path, csv_names[1])
             try:
                 len(cls.aba['si_df'])

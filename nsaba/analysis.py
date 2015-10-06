@@ -204,7 +204,6 @@ class NsabaAnalysis(object):
         if not quant and split_method == 'var':
             quant = 85
 
-
         if len(self.no.ge) < sample_num:
             raise ValueError("Sample number exceeds stored number of Entrez IDs")
         sam_ids = random.sample(self.no.ge.keys(), sample_num)
