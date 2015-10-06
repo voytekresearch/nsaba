@@ -36,29 +36,28 @@ class NsabaAnalysis(object):
     def _split_mask(self, term_vec, method='var', **kwargs):
         """ Constructs splitting mask via specified method"""
         if method == 'var':
-            if 'quant' in kwargs:
-                thres = np.percentile(term_vec, kwargs['quant'])
-                mask = np.array([True if coeff > thres else False for coeff in term_vec])
-                return mask
-            else:
-                raise KeyError("quant parameter never set in conjunction with 'var' method")
+            if 'quant' in kwargs is None:
+                kwargs['quant'] = 85
+            thres = np.percentile(term_vec, kwargs['quant'])
+            mask = np.array([True if coeff > thres else False for coeff in term_vec])
+            return mask
         elif method == 'kmeans':
             X = [[x] for x in term_vec]
             init_clusters = np.array([[min(term_vec)], [max(term_vec)]])
-            kmn = KMeans(n_clusters=2, init=init_clusters)
+            kmn = KMeans(n_clusters=2, init=init_clusters, n_init=1)
             mask = kmn.fit_predict(X)
             return mask.astype(bool)
         elif method == 'mog':
             X = [[x] for x in term_vec]
             gm = mixture.GMM(n_components=2)
-            y = gm.fit(X)
-            if stats.mode(y)[0][0] == 0:
+            gm.fit(X)
+            if stats.mode(gm.predict(X))[0][0] == 0:
                 mask = np.array([True if gm.predict([coeff]) == 1 else False for coeff in term_vec])
             else:
                 mask = np.array([False if gm.predict([coeff]) == 1 else True for coeff in term_vec])
             return mask
         else:
-            raise ValueError("method parameter '%s' not recognized")
+            raise ValueError("method parameter '%s' not recognized" % method)
 
     def _split_groups(self, ge_vec, mask):
         """Splits gene samples into control and functional network"""
@@ -69,8 +68,6 @@ class NsabaAnalysis(object):
 
     def t_test(self, term, gene, split_method='var', quant=None, log=False, graphops='density'):
         """ T-Test of gene expression between term and non-term coordinates"""
-        if not quant and split_method == 'var':
-            quant = 85
         analmat = self.no.make_ge_ns_mat(term, [gene])
         # Splitting groups
         mask = self._split_mask(analmat[:, 1], method=split_method, quant=quant)
@@ -194,15 +191,15 @@ class NsabaAnalysis(object):
             raise ValueError("graphops parameter '%s' not recognized" % graphops)
 
     @preprint('This may take a couple of minutes ...')
-    def t_test_multi(self, term, quant=None, sample_num=None, split_method='var', genes_of_interest=[]):
+    def t_test_multi(self, term, quant=None, sample_num=None, split_method='var', genes_of_interest=None):
         if term not in self.no.term:
             raise ValueError("Term activation not generated for '%s" % term)
         if not sample_num:
             sample_num = len(self.no.ge.keys())
         elif sample_num <= 0:
             raise ValueError("'sample_num' parameter must be greater than 0")
-        if not quant and split_method == 'var':
-            quant = 85
+        if not genes_of_interest:
+            genes_of_interest = []
 
         if len(self.no.ge) < sample_num:
             raise ValueError("Sample number exceeds stored number of Entrez IDs")

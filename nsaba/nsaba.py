@@ -36,7 +36,8 @@ class NsabaBase(object):
 
     @classmethod
     @preprint('This may take a minute or two ...')
-    def aba_load(cls, aba_root=".", aba_files=['normalized_microarray_donor9861'], csv_names=None):
+    def aba_load(cls, aba_root=".", using_aba_files=False,
+                 aba_files=['normalized_microarray_donor9861'], csv_names=None):
         """Initialization of 'aba' dictionary"""
 
         if not csv_names:
@@ -51,11 +52,10 @@ class NsabaBase(object):
 
         for aba_file in aba_files:
             print 'Initializing gene data from %s' % aba_file
-            ## fucking digusting hack
-            if aba_file == 'null':
-                aba_path = aba_root
-            else:
+            if using_aba_files:
                 aba_path = aba_root+aba_file
+            else:
+                aba_path = aba_root
             csv_path = os.path.join(aba_path, csv_names[1])
             try:
                 len(cls.aba['si_df'])
