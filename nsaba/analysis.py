@@ -205,7 +205,7 @@ class NsabaAnalysis(object):
             raise ValueError("Sample number exceeds stored number of Entrez IDs")
         sam_ids = random.sample(self.no.ge.keys(), sample_num)
         ge_mat = self.no.make_ge_ns_mat(term, sam_ids).T[:-1]
-        term_act_vector = self.no.make_ge_ns_mat(term, sam_ids).T[-1:]
+        term_act_vector = self.no.make_ge_ns_mat(term, sam_ids).T[-1:][0]
 
         mask = self._split_mask(term_act_vector, method=split_method, quant=quant)
 
