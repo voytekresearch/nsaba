@@ -1,2 +1,3 @@
  -- Optimize get_act_values()
- -- Entrez ID search webscraper
+ -- Validation module
+ -- Sequential hdf5 activation storage

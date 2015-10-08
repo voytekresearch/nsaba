@@ -392,6 +392,8 @@ class Nsaba(NsabaBase):
         ns_coord_tree, ns_coord_act_df = self._term_to_coords(term, thresh)
 
         self.term[term] = {}
+        self.term[term]['threshold'] = thresh
+        self.term[term]['search_radius'] = search_radii
         self.term[term]['ns_act_vector'] = []
         self.term[term]['aba_void_indices'] = []
 
