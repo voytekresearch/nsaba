@@ -462,3 +462,25 @@ class Nsaba(NsabaBase):
         except TypeError:
             print "'f' is improper, ensure 'f' receives only one parameter and returns a numeric type"
 
+
+def load_gene_file(path='.'):
+    if isinstance(path, str):
+        gene_file = path+'gene_info.csv'
+        df = pd.read_csv(gene_file)
+        return df
+    else:
+        raise TypeError("gene no must be a string")
+
+
+def get_gene_info(path, gene_ids):
+    df = load_gene_file(path)
+    output = []
+    for gene_id in gene_ids:
+        if isinstance(gene_id, str):
+            if int(gene_id) in df['Entrez']:
+                output.append((df[df['Entrez'] == int(gene_id)].as_matrix()[0]))
+            else:
+                print 'Gene '+gene_id+' not found in NIH database'
+        else:
+            print str(gene_id)+' must be a str'
+    return output
