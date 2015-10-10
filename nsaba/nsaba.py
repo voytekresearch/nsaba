@@ -49,7 +49,6 @@ class NsabaBase(object):
         if len(csv_names) != 3:
             raise IndexError("'csv_names' must a list of 3 'str' variables")
 
-
         for aba_file in aba_files:
             print 'Initializing gene data from %s' % aba_file
             if using_aba_files:

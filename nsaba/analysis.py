@@ -194,11 +194,11 @@ class NsabaAnalysis(object):
     def t_test_multi(self, term, quant=None, sample_num=None, split_method='var', genes_of_interest=None):
         if term not in self.no.term:
             raise ValueError("Term activation not generated for '%s" % term)
-        if not sample_num:
+        if sample_num == None:
             sample_num = len(self.no.ge.keys())
         elif sample_num <= 0:
             raise ValueError("'sample_num' parameter must be greater than 0")
-        if not genes_of_interest:
+        if genes_of_interest == None:
             genes_of_interest = []
 
         if len(self.no.ge) < sample_num:
@@ -296,3 +296,69 @@ class NsabaAnalysis(object):
             writer = csv.writer(csvfile)
             for i in top_genes:
                 writer.writerow([i[0], i[3], i[1], i[2], i[4]])
+
+    def validate(self, term, genes, alt_genes=None, method='t_test', quant=85):
+        real_gene_output = []
+        random_gene_output = []
+
+        if method == 't_test':
+            ttest_metrics = self.t_test_multi(term, quant=quant)
+            if alt_genes == None:
+                alt_genes = random.randint(1, len(ttest_metrics['results']), len(genes))
+            for i in ttest_metrics['results']:
+                if int(i[0]) in genes:
+                    real_gene_output.append(i[1])
+                if int(i[0]) in alt_genes:
+                    random_gene_output.append(i[1])
+            #return stats.ttest_ind(real_gene_output, random_gene_output)[1]  # p value
+            return real_gene_output, random_gene_output
+
+        if method == 'pearson':
+            alt_indices = random.randint(1, len(self.no.aba['probe_df']['entrez_id']), len(genes))
+            alt_genes = self.no.aba['probe_df']['entrez_id'][alt_indices]
+            for gene in genes:
+                ge_ns_mat = self.no.make_ge_ns_mat(term, gene)
+                real_gene_output.append(np.corrcoef(ge_ns_mat[:, 0], np.log(ge_ns_mat[:, 1])))
+            for gene in alt_genes:
+                ge_ns_mat = self.no.make_ge_ns_mat(term, gene)
+                real_gene_output.append(np.corrcoef(ge_ns_mat[:, 0], np.log(ge_ns_mat[:, 1])))
+            return real_gene_output, random_gene_output
+
+        if method == 'spearman':
+            alt_indices = random.randint(1, len(self.no.aba['probe_df']['entrez_id']), len(genes))
+            alt_genes = self.no.aba['probe_df']['entrez_id'][alt_indices]
+            for gene in genes:
+                ge_ns_mat = self.no.make_ge_ns_mat(term, gene)
+                real_gene_output.append(stats.spearmanr(ge_ns_mat[:, 0], ge_ns_mat[:, 1]))
+            for gene in alt_genes:
+                ge_ns_mat = self.no.make_ge_ns_mat(term, gene)
+                real_gene_output.append(stats.spearmanr(ge_ns_mat[:, 0], ge_ns_mat[:, 1]))
+            return real_gene_output, random_gene_output
+
+        if method == 'regression':
+            alt_indices = random.randint(1, len(self.no.aba['probe_df']['entrez_id']), len(genes))
+            alt_genes = self.no.aba['probe_df']['entrez_id'][alt_indices]
+            for gene in genes:
+                ge_ns_mat = self.no.make_ge_ns_mat(term, gene)
+                X = np.vstack([ge_ns_mat[:, 0], np.ones(len(ge_ns_mat[:, 0]))]).T
+                m, c = np.linalg.lstsq(X, np.log(ge_ns_mat[:, 1]))[0]
+                real_gene_output.append(m, c)
+            for gene in alt_genes:
+                ge_ns_mat = self.no.make_ge_ns_mat(term, gene)
+                X = np.vstack([ge_ns_mat[:, 0], np.ones(len(ge_ns_mat[:, 0]))]).T
+                m, c = np.linalg.lstsq(X, np.log(ge_ns_mat[:, 1]))[0]
+                random_gene_output.append(m, c)
+            return real_gene_output, random_gene_output
+
+
+def load_gene_list(path, filename):
+        if isinstance(path, str):
+            if isinstance(filename, str):
+                my_dataframe = pd.read_csv(path+filename)
+                my_genes = my_dataframe['Entrez'].as_matrix()
+                return my_genes
+            else:
+                print 'filename must be a string'
+        else:
+            print 'filename must be a string'
+
