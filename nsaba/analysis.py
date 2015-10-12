@@ -16,6 +16,7 @@ from sklearn.cluster import KMeans
 from sklearn import mixture
 import csv
 import time
+import pandas as pd
 
 
 def cohen_d(x1, x2, n1, n2):
@@ -223,11 +224,9 @@ class NsabaAnalysis(object):
                 continue
             if eid in genes_of_interest:
                 print 'Gene: ' + str(eid) + '  Effect Size: '+str(d)
-
         # Sort effect sizes from greatest to smallest in magnitude
         gene_stats.sort(key=lambda rec: rec.cohen_d)
         ttest_metrics['results'] = gene_stats
-
         return ttest_metrics
 
     @preprint('Fetching NIH gene descriptions ...')
@@ -235,13 +234,13 @@ class NsabaAnalysis(object):
         """Prints: ID, p-value, Cohen's d, gene description for genes with the largest effect sizes"""
         top_genes = []
         for rec in ttest_metrics['results'][:nih_fetch_num]:
-            time.sleep(.5)
+            print rec
             try:
-                gene_dat = get_gene_info(gene_path, str(int(rec.entrez)))
-                gene_name = gene_dat[1]
-                gene_description = gene_dat[2]
+                gene_dat = get_gene_info(gene_path, [str(int(rec.entrez))])
+                gene_name = gene_dat[0][1]
+                gene_description = gene_dat[0][2]
                 top_genes.append((rec.entrez, rec.cohen_d, rec.p_value, gene_name, gene_description))
-            except TypeError:
+            except IndexError:
                 continue
 
         if printme:

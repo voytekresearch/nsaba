@@ -182,6 +182,12 @@ class Nsaba(NsabaBase):
         self.ge = pickle.load(open(os.path.join(path, pkl_file), 'rb'))
         print "'ge' dictionary successfully loaded"
 
+    def is_gene(self, gene):
+        if gene in self.aba['probe_df']['entrez_id']:
+            return True
+        else:
+            return False
+
     def is_term(self, term):
         """Checks if this term is in the neurosynth database """
         if term in self.ns['features_df'].columns:
