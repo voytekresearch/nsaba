@@ -36,7 +36,7 @@ class NsabaAnalysis(object):
     def _split_mask(self, term_vec, method='var', **kwargs):
         """ Constructs splitting mask via specified method"""
         if method == 'var':
-            if 'quant' in kwargs is None:
+            if 'quant' not in kwargs:
                 kwargs['quant'] = 85
             thres = np.percentile(term_vec, kwargs['quant'])
             mask = np.array([True if coeff > thres else False for coeff in term_vec])
@@ -66,11 +66,11 @@ class NsabaAnalysis(object):
         control_grp = np.array(list(diff))
         return control_grp, functional_grp
 
-    def t_test(self, term, gene, split_method='var', quant=None, log=False, graphops='density'):
+    def t_test(self, term, gene, split_method='var', log=False, graphops='density', **kwargs):
         """ T-Test of gene expression between term and non-term coordinates"""
         analmat = self.no.make_ge_ns_mat(term, [gene])
         # Splitting groups
-        mask = self._split_mask(analmat[:, 1], method=split_method, quant=quant)
+        mask = self._split_mask(analmat[:, 1], method=split_method, **kwargs)
         cont_grp, funct_grp = self._split_groups(analmat[:, 0], mask)
         if log:
             funct_grp = np.log(funct_grp)
