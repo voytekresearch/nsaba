@@ -16,7 +16,6 @@ import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 from sklearn import mixture
 import csv
-import time
 import pandas as pd
 
 
@@ -193,7 +192,7 @@ class NsabaAnalysis(object):
             raise ValueError("graphops parameter '%s' not recognized" % graphops)
 
     @preprint('This may take a couple of minutes ...')
-    def t_test_multi(self, term, quant=None, sample_num=None, split_method='var', genes_of_interest=None):
+    def t_test_multi(self, term, quant=None, sample_num=None, split_method='var', genes_of_interest=None, full=False):
         if term not in self.no.term:
             raise ValueError("Term activation not generated for '%s" % term)
         if sample_num == None:
@@ -219,12 +218,15 @@ class NsabaAnalysis(object):
             test_stats = stats.ttest_ind(cont_grp, funct_grp)
             d = cohen_d(cont_grp, funct_grp, len(cont_grp), len(funct_grp))
             # One-sided T-Test
-            if test_stats[0] <= 0:
-                gene_stats.append(self.gene_rec(eid, d, test_stats[1]))
+            if full:
+                gene_stats.append(self.gene_rec(int(eid), d, test_stats[1]))
             else:
-                continue
+                if test_stats[0] <= 0:
+                    gene_stats.append(self.gene_rec(int(eid), d, test_stats[1]))
+                else:
+                    continue
             if eid in genes_of_interest:
-                print 'Gene: ' + str(eid) + '  Effect Size: '+str(d)
+                print 'Gene: ' + str(int(eid)) + '  Effect Size: '+str(d)
         # Sort effect sizes from greatest to smallest in magnitude
         gene_stats.sort(key=lambda rec: rec.cohen_d)
         ttest_metrics['results'] = gene_stats
@@ -297,14 +299,14 @@ class NsabaAnalysis(object):
             for i in top_genes:
                 writer.writerow([i[0], i[3], i[1], i[2], i[4]])
 
-    def validate(self, term, genes, alt_genes=None, method='t_test', quant=85):
+    def validate_with_t_test(self, term, genes, alt_genes=None, method='t_test', quant=85):
         real_gene_output = []
         random_gene_output = []
 
         if method == 't_test':
-            ttest_metrics = self.t_test_multi(term, quant=quant)
+            ttest_metrics = self.t_test_multi(term, quant=quant, full=True)
             if alt_genes == None:
-                alt_genes = random.randint(1, len(ttest_metrics['results']), len(genes))
+                alt_genes = np.random.choice(self.no.aba['probe_df']['entrez_id'][self.no.aba['probe_df']['entrez_id'].notnull()], len(genes))
             for i in ttest_metrics['results']:
                 if int(i[0]) in genes:
                     real_gene_output.append(i[1])
@@ -314,8 +316,7 @@ class NsabaAnalysis(object):
             return real_gene_output, random_gene_output
 
         if method == 'pearson':
-            alt_indices = random.randint(1, len(self.no.aba['probe_df']['entrez_id']), len(genes))
-            alt_genes = self.no.aba['probe_df']['entrez_id'][alt_indices]
+            alt_genes = np.random.choice(self.no.aba['probe_df']['entrez_id'][self.no.aba['probe_df']['entrez_id'].notnull()], len(genes))
             for gene in genes:
                 ge_ns_mat = self.no.make_ge_ns_mat(term, gene)
                 real_gene_output.append(np.corrcoef(ge_ns_mat[:, 0], np.log(ge_ns_mat[:, 1])))
@@ -325,8 +326,7 @@ class NsabaAnalysis(object):
             return real_gene_output, random_gene_output
 
         if method == 'spearman':
-            alt_indices = random.randint(1, len(self.no.aba['probe_df']['entrez_id']), len(genes))
-            alt_genes = self.no.aba['probe_df']['entrez_id'][alt_indices]
+            alt_genes = np.random.choice(self.no.aba['probe_df']['entrez_id'][self.no.aba['probe_df']['entrez_id'].notnull()], len(genes))
             for gene in genes:
                 ge_ns_mat = self.no.make_ge_ns_mat(term, gene)
                 real_gene_output.append(stats.spearmanr(ge_ns_mat[:, 0], ge_ns_mat[:, 1]))
@@ -336,8 +336,7 @@ class NsabaAnalysis(object):
             return real_gene_output, random_gene_output
 
         if method == 'regression':
-            alt_indices = random.randint(1, len(self.no.aba['probe_df']['entrez_id']), len(genes))
-            alt_genes = self.no.aba['probe_df']['entrez_id'][alt_indices]
+            alt_genes = np.random.choice(self.no.aba['probe_df']['entrez_id'][self.no.aba['probe_df']['entrez_id'].notnull()], len(genes))
             for gene in genes:
                 ge_ns_mat = self.no.make_ge_ns_mat(term, gene)
                 X = np.vstack([ge_ns_mat[:, 0], np.ones(len(ge_ns_mat[:, 0]))]).T
@@ -350,6 +349,19 @@ class NsabaAnalysis(object):
                 random_gene_output.append(m, c)
             return real_gene_output, random_gene_output
 
+    def validate_by_alpha(self, term, genes, method='t_test', quant=85, alpha = 0.05):
+
+        if method == 't_test':
+            ttest_metrics = self.t_test_multi(term, quant=quant)
+            alpha_studies = int(alpha * len(ttest_metrics['results']))
+
+            sorted_studies = sorted(ttest_metrics['results'], key=lambda x: x.cohen_d)[:alpha_studies]
+            genes_found = []
+            for i in sorted_studies:
+                for gene in genes:
+                    if int(gene) == int(i.entrez):
+                        genes_found.append(gene)
+            return genes_found
 
 def load_gene_list(path, filename):
         if isinstance(path, str):
