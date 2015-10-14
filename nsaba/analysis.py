@@ -369,7 +369,6 @@ class NsabaAnalysis(object):
             return real_gene_output, random_gene_output
 
     def validate_by_alpha(self, term, genes, method='t_test', quant=85, alpha=0.05):
-
         genes_found = []
         if method == 't_test':
             ttest_metrics = self.t_test_multi(term, quant=quant)
