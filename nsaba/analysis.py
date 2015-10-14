@@ -299,12 +299,31 @@ class NsabaAnalysis(object):
             for i in top_genes:
                 writer.writerow([i[0], i[3], i[1], i[2], i[4]])
 
-    def validate_with_t_test(self, term, genes, alt_genes=None, method='t_test', quant=85):
+    def term_to_genes(self, term, method='spearman'):
+        if term not in self.no.term:
+            raise ValueError("Term activation not generated for '%s" % term)
+        ge_mat = self.no.make_ge_ns_mat(term, self.no.ge.keys())
+
+        if method == 'spearman':
+            r_vals = [stats.spearmanr(ge_mat[:, ge_mat.shape[1]-1], ge_mat[:, r])[0] for r in xrange(len(self.no.ge.keys()))]
+            return r_vals
+        if method == 'pearson':
+            r_vals = [np.corrcoef(ge_mat[:, ge_mat.shape[1]-1], ge_mat[:, r])[1, 0] for r in xrange(len(self.no.ge.keys()))]
+            return r_vals
+        if method == 'regression':
+            m_vals = []
+            for gene in xrange(len(self.no.ge.keys())):
+                X = np.vstack([ge_mat[:, ge_mat.shape[1]-1], np.ones(len(ge_mat[:, 0]))]).T
+                m, c = np.linalg.lstsq(X, ge_mat[:, gene])[0]
+                m_vals.append(m)
+            return m_vals
+
+    def validate_with_t_test(self, term, genes, alt_genes=None, method='t_test', quant=None, split_method='var'):
         real_gene_output = []
         random_gene_output = []
 
         if method == 't_test':
-            ttest_metrics = self.t_test_multi(term, quant=quant, full=True)
+            ttest_metrics = self.t_test_multi(term, quant=quant, split_method=split_method, full=True)
             if alt_genes == None:
                 alt_genes = np.random.choice(self.no.aba['probe_df']['entrez_id'][self.no.aba['probe_df']['entrez_id'].notnull()], len(genes))
             for i in ttest_metrics['results']:
@@ -318,50 +337,89 @@ class NsabaAnalysis(object):
         if method == 'pearson':
             alt_genes = np.random.choice(self.no.aba['probe_df']['entrez_id'][self.no.aba['probe_df']['entrez_id'].notnull()], len(genes))
             for gene in genes:
-                ge_ns_mat = self.no.make_ge_ns_mat(term, gene)
-                real_gene_output.append(np.corrcoef(ge_ns_mat[:, 0], np.log(ge_ns_mat[:, 1])))
+                ge_ns_mat = self.no.make_ge_ns_mat(term, [gene])
+                real_gene_output.append(np.corrcoef(ge_ns_mat[:, 0], ge_ns_mat[:, 1])[1, 0])
             for gene in alt_genes:
-                ge_ns_mat = self.no.make_ge_ns_mat(term, gene)
-                real_gene_output.append(np.corrcoef(ge_ns_mat[:, 0], np.log(ge_ns_mat[:, 1])))
+                ge_ns_mat = self.no.make_ge_ns_mat(term, [gene])
+                random_gene_output.append(np.corrcoef(ge_ns_mat[:, 0], ge_ns_mat[:, 1])[1, 0])
             return real_gene_output, random_gene_output
 
         if method == 'spearman':
             alt_genes = np.random.choice(self.no.aba['probe_df']['entrez_id'][self.no.aba['probe_df']['entrez_id'].notnull()], len(genes))
             for gene in genes:
-                ge_ns_mat = self.no.make_ge_ns_mat(term, gene)
-                real_gene_output.append(stats.spearmanr(ge_ns_mat[:, 0], ge_ns_mat[:, 1]))
+                ge_ns_mat = self.no.make_ge_ns_mat(term, [gene])
+                real_gene_output.append(stats.spearmanr(ge_ns_mat[:, 0], ge_ns_mat[:, 1])[0])
             for gene in alt_genes:
-                ge_ns_mat = self.no.make_ge_ns_mat(term, gene)
-                real_gene_output.append(stats.spearmanr(ge_ns_mat[:, 0], ge_ns_mat[:, 1]))
+                ge_ns_mat = self.no.make_ge_ns_mat(term, [gene])
+                random_gene_output.append(stats.spearmanr(ge_ns_mat[:, 0], ge_ns_mat[:, 1])[0])
             return real_gene_output, random_gene_output
 
         if method == 'regression':
             alt_genes = np.random.choice(self.no.aba['probe_df']['entrez_id'][self.no.aba['probe_df']['entrez_id'].notnull()], len(genes))
             for gene in genes:
-                ge_ns_mat = self.no.make_ge_ns_mat(term, gene)
+                ge_ns_mat = self.no.make_ge_ns_mat(term, [gene])
                 X = np.vstack([ge_ns_mat[:, 0], np.ones(len(ge_ns_mat[:, 0]))]).T
-                m, c = np.linalg.lstsq(X, np.log(ge_ns_mat[:, 1]))[0]
-                real_gene_output.append(m, c)
+                m, c = np.linalg.lstsq(X, ge_ns_mat[:, 1])[0]
+                real_gene_output.append(m)
             for gene in alt_genes:
-                ge_ns_mat = self.no.make_ge_ns_mat(term, gene)
+                ge_ns_mat = self.no.make_ge_ns_mat(term, [gene])
                 X = np.vstack([ge_ns_mat[:, 0], np.ones(len(ge_ns_mat[:, 0]))]).T
-                m, c = np.linalg.lstsq(X, np.log(ge_ns_mat[:, 1]))[0]
-                random_gene_output.append(m, c)
+                m, c = np.linalg.lstsq(X, ge_ns_mat[:, 1])[0]
+                random_gene_output.append(m)
             return real_gene_output, random_gene_output
 
-    def validate_by_alpha(self, term, genes, method='t_test', quant=85, alpha = 0.05):
+    def validate_by_alpha(self, term, genes, method='t_test', quant=85, alpha=0.05):
 
+        genes_found = []
         if method == 't_test':
             ttest_metrics = self.t_test_multi(term, quant=quant)
             alpha_studies = int(alpha * len(ttest_metrics['results']))
 
             sorted_studies = sorted(ttest_metrics['results'], key=lambda x: x.cohen_d)[:alpha_studies]
-            genes_found = []
+
             for i in sorted_studies:
                 for gene in genes:
                     if int(gene) == int(i.entrez):
                         genes_found.append(gene)
             return genes_found
+
+        if method == 'pearson':
+            r_vals = self.term_to_genes(term=term, method='pearson')
+            alpha_study_threshold = int(alpha * len(r_vals))
+            alpha_index = sorted(r_vals)[alpha_study_threshold]
+            for gene in genes:
+                ge_ns_mat = self.no.make_ge_ns_mat(term, [gene])
+                r_val = np.corrcoef(ge_ns_mat[:, 0], ge_ns_mat[:, 1])[1, 0]
+                if r_val > alpha_index:
+                    genes_found.append(gene)
+            return genes_found
+
+        if method == 'spearman':
+            r_vals = self.term_to_genes(term=term, method='spearman')
+            alpha_study_threshold = int(alpha * len(r_vals))
+            alpha_index = sorted(r_vals)[alpha_study_threshold]
+            for gene in genes:
+                ge_ns_mat = self.no.make_ge_ns_mat(term, [gene])
+                r_val = stats.spearmanr(ge_ns_mat[:, 0], ge_ns_mat[:, 1])[0]
+                if r_val > alpha_index:
+                    genes_found.append(gene)
+            return genes_found
+
+        if method == 'regression':
+            m_vals = self.term_to_genes(term=term, method='regression')
+            alpha_study_threshold = int(alpha * len(m_vals))
+            alpha_index = sorted(m_vals)[alpha_study_threshold]
+            for gene in genes:
+                ge_ns_mat = self.no.make_ge_ns_mat(term, [gene])
+                X = np.vstack([ge_ns_mat[:, 0], np.ones(len(ge_ns_mat[:, 0]))]).T
+                m, c = np.linalg.lstsq(X, ge_ns_mat[:, 1])[0]
+                if m > alpha_index:
+                    genes_found.append(gene)
+            return genes_found
+        else:
+            print 'Invalid analysis method. Use pearson, spearman, regression, or t_test'
+            return []
+
 
 def load_gene_list(path, filename):
         if isinstance(path, str):

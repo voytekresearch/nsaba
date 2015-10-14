@@ -347,7 +347,7 @@ class Nsaba(NsabaBase):
         return np.array(bucket_act_vec)*weight
 
     @preprint('This may take a few minutes...')
-    def _knn_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii, k, smoothing= 'gaussian'):
+    def _knn_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii, k, smoothing='gaussian'):
         """KNN method """
         for irow, xyz in enumerate(self.aba['mni_coords'].data):
             coord_inds, radii = self._knn_search(xyz, ns_coord_tree, search_radii, k)
