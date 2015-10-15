@@ -385,7 +385,8 @@ class NsabaAnalysis(object):
         if method == 'pearson':
             r_vals = self.term_to_genes(term=term, method='pearson')
             alpha_study_threshold = int(alpha * len(r_vals))
-            alpha_index = sorted(r_vals)[alpha_study_threshold]
+            alpha_index = [i for i in reversed(sorted(r_vals))][alpha_study_threshold]
+            print "pearson's r must be > " + str(alpha_index)
             for gene in genes:
                 ge_ns_mat = self.no.make_ge_ns_mat(term, [gene])
                 r_val = np.corrcoef(ge_ns_mat[:, 0], ge_ns_mat[:, 1])[1, 0]
@@ -396,7 +397,8 @@ class NsabaAnalysis(object):
         if method == 'spearman':
             r_vals = self.term_to_genes(term=term, method='spearman')
             alpha_study_threshold = int(alpha * len(r_vals))
-            alpha_index = sorted(r_vals)[alpha_study_threshold]
+            alpha_index = [i for i in reversed(sorted(r_vals))][alpha_study_threshold]
+            print "spearman's r must be > " + str(alpha_index)
             for gene in genes:
                 ge_ns_mat = self.no.make_ge_ns_mat(term, [gene])
                 r_val = stats.spearmanr(ge_ns_mat[:, 0], ge_ns_mat[:, 1])[0]
@@ -407,7 +409,8 @@ class NsabaAnalysis(object):
         if method == 'regression':
             m_vals = self.term_to_genes(term=term, method='regression')
             alpha_study_threshold = int(alpha * len(m_vals))
-            alpha_index = sorted(m_vals)[alpha_study_threshold]
+            alpha_index = [i for i in reversed(sorted(m_vals))][alpha_study_threshold]
+            print "slope of linear regression must be > " + str(alpha_index)
             for gene in genes:
                 ge_ns_mat = self.no.make_ge_ns_mat(term, [gene])
                 X = np.vstack([ge_ns_mat[:, 0], np.ones(len(ge_ns_mat[:, 0]))]).T

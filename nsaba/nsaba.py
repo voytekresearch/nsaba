@@ -335,58 +335,47 @@ class Nsaba(NsabaBase):
         r, inds = coord_tree.query(xyz, k)
         return inds[r < max_rad], r[r < max_rad]
 
-    def _get_act_values(self, bucket, weight, term, ns_coord_act_df):
+    def _get_act_values(self, bucket, weight, term, ns_coord_act_df, method='mean'):
         """Returns weighted NS activation """
         bucket_act_vec = []
         for coords in bucket:
             coord = ns_coord_act_df.ix[(ns_coord_act_df['x'] == coords[0])
                                     & (ns_coord_act_df['y'] == coords[1])
                                     & (ns_coord_act_df['z'] == coords[2])][term]
-            bucket_act_vec.append(coord.mean())
+            if method == 'mean':
+                bucket_act_vec.append(coord.mean())
+            if method == 'sum':
+                bucket_act_vec.append(coord.sum())
+            if method == 'max':
+                bucket_act_vec.append(coord.max())
+
 
         return np.array(bucket_act_vec)*weight
 
     @preprint('This may take a few minutes...')
-    def _knn_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii, k, smoothing='gaussian'):
+    def _knn_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii, k, smoothing='gaussian',
+                    estimation_method='mean'):
         """KNN method """
         for irow, xyz in enumerate(self.aba['mni_coords'].data):
             coord_inds, radii = self._knn_search(xyz, ns_coord_tree, search_radii, k)
             coords = ns_coord_tree.data[coord_inds]
-
-            #  pretty sketchy
-            if smoothing == 'sum':
-                void_test = []
-                summed_activation = 0
-                for coord in coords:
-                    this_coord = ns_coord_act_df.ix[(ns_coord_act_df['x'] == coord[0])
-                                        & (ns_coord_act_df['y'] == coord[1])
-                                        & (ns_coord_act_df['z'] == coord[2])][term]
-                    summed_activation += np.sum(this_coord)
-                    void_test.append(summed_activation)
-
-                if len(void_test) == 0:
-                    self.term[term]['aba_void_indices'].append(irow)
-                else:
-                    self.term[term]['ns_act_vector'].append(summed_activation)
+            if smoothing == 'flat':
+                weight = [1 for r in radii]
+                estimated_activation = self._get_act_values(coords, weight, term, ns_coord_act_df, method=estimation_method)
 
             if smoothing == 'gaussian':
                 gaussian_window = gaussian(len(radii)*2+1, std=2)  # std 2 is arbitrary but looks nice
                 weight = [gaussian_window[r+len(radii)-1] for r in radii]
-                weighted_means = self._get_act_values(coords, weight, term, ns_coord_act_df)
-                if len(weighted_means) == 0:
-                    self.term[term]['aba_void_indices'].append(irow)
-                else:
-                    act_coeff = np.sum(weighted_means) / np.sum(weight)
-                    self.term[term]['ns_act_vector'].append(act_coeff)
+                estimated_activation = self._get_act_values(coords, weight, term, ns_coord_act_df, method=estimation_method)
 
             else:
                 weight = self.__ns_weight_f(radii)
-                weighted_means = self._get_act_values(coords, weight, term, ns_coord_act_df)
-                if len(weighted_means) == 0:
-                    self.term[term]['aba_void_indices'].append(irow)
-                else:
-                    act_coeff = np.sum(weighted_means) / np.sum(weight)
-                    self.term[term]['ns_act_vector'].append(act_coeff)
+                estimated_activation = self._get_act_values(coords, weight, term, ns_coord_act_df, method=estimation_method)
+            if len(estimated_activation) == 0:
+                self.term[term]['aba_void_indices'].append(irow)
+            else:
+                act_coeff = np.sum(estimated_activation)  #  / np.sum(weight) commented out to see what happens
+                self.term[term]['ns_act_vector'].append(act_coeff)
 
     @preprint('This may take a few minutes...')
     def _sphere_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii, smoothing='gaussian'):
@@ -413,7 +402,7 @@ class Nsaba(NsabaBase):
                 act_coeff = sphere_vals[0] / sphere_vals[1]
                 self.term[term]['ns_act_vector'].append(act_coeff)
 
-    def get_ns_act(self, term, thresh=-1, method='knn', smoothing='gaussian', search_radii=3, k=None):
+    def get_ns_act(self, term, thresh=-1, method='knn', smoothing='gaussian', search_radii=3, k=None, estimation_method='mean'):
         """Generates NS activation vector about ABA MNI coordinates  timed at 26.1 s"""
         if not self.is_term(term):
             raise ValueError("'%s' is not a registered term." % term)
@@ -429,7 +418,7 @@ class Nsaba(NsabaBase):
         if method == 'knn':
             if k is None:
                 k = 20
-            self._knn_method(term, ns_coord_act_df, ns_coord_tree, search_radii, k, smoothing=smoothing)
+            self._knn_method(term, ns_coord_act_df, ns_coord_tree, search_radii, k, smoothing=smoothing,estimation_method=estimation_method)
         elif method == 'sphere':
             if k is not None:
                 raise ValueError("'k' parameter cannot be used with 'sphere' method.")
