@@ -501,4 +501,4 @@ def get_gene_info(path, gene_ids):
                 print 'Gene '+gene_id+' not found in NIH database'
         else:
             print str(gene_id)+' must be a str'
-    return output
+    re
