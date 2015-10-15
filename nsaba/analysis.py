@@ -195,7 +195,8 @@ class NsabaAnalysis(object):
             raise ValueError("graphops parameter '%s' not recognized" % graphops)
 
     @preprint('This may take a couple of minutes ...')
-    def t_test_multi(self, gi_csv_path, nih_only, term, quant=None, sample_num=None, split_method='var', genes_of_interest=None, **kwargs):
+    def t_test_multi(self, gi_csv_path, nih_only, term, quant=None, sample_num=None, split_method='var',
+                     genes_of_interest=None, **kwargs):
         if term not in self.no.term:
             raise ValueError("Term activation not generated for '%s" % term)
         if sample_num == None:
@@ -219,7 +220,7 @@ class NsabaAnalysis(object):
                     df = load_gene_file()
                 nih_ids = df['entrez'].as_matrix()
                 sam_ids = [entrez_id for entrez_id in nih_ids if entrez_id in nih_ids]
-                print "Using NIH described genes only; sample size now %d" % (len(sam_ids))
+                print "Using NIH described genes only; Entrez ID sample size now %d" % (len(sam_ids))
 
         ge_mat = self.no.make_ge_ns_mat(term, sam_ids).T[:-1]
         term_act_vector = self.no.make_ge_ns_mat(term, sam_ids).T[-1:][0]
