@@ -347,22 +347,46 @@ class Nsaba(NsabaBase):
         return np.array(bucket_act_vec)*weight
 
     @preprint('This may take a few minutes...')
-    def _knn_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii, k, smoothing= 'gaussian'):
+    def _knn_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii, k, smoothing='gaussian'):
         """KNN method """
         for irow, xyz in enumerate(self.aba['mni_coords'].data):
             coord_inds, radii = self._knn_search(xyz, ns_coord_tree, search_radii, k)
             coords = ns_coord_tree.data[coord_inds]
+
+            #  pretty sketchy
+            if smoothing == 'sum':
+                void_test = []
+                summed_activation = 0
+                for coord in coords:
+                    this_coord = ns_coord_act_df.ix[(ns_coord_act_df['x'] == coord[0])
+                                        & (ns_coord_act_df['y'] == coord[1])
+                                        & (ns_coord_act_df['z'] == coord[2])][term]
+                    summed_activation += np.sum(this_coord)
+                    void_test.append(summed_activation)
+
+                if len(void_test) == 0:
+                    self.term[term]['aba_void_indices'].append(irow)
+                else:
+                    self.term[term]['ns_act_vector'].append(summed_activation)
+
             if smoothing == 'gaussian':
                 gaussian_window = gaussian(len(radii)*2+1, std=2)  # std 2 is arbitrary but looks nice
                 weight = [gaussian_window[r+len(radii)-1] for r in radii]
+                weighted_means = self._get_act_values(coords, weight, term, ns_coord_act_df)
+                if len(weighted_means) == 0:
+                    self.term[term]['aba_void_indices'].append(irow)
+                else:
+                    act_coeff = np.sum(weighted_means) / np.sum(weight)
+                    self.term[term]['ns_act_vector'].append(act_coeff)
+
             else:
                 weight = self.__ns_weight_f(radii)
-            weighted_means = self._get_act_values(coords, weight, term, ns_coord_act_df)
-            if len(weighted_means) == 0:
-                self.term[term]['aba_void_indices'].append(irow)
-            else:
-                act_coeff = np.sum(weighted_means) / np.sum(weight)
-                self.term[term]['ns_act_vector'].append(act_coeff)
+                weighted_means = self._get_act_values(coords, weight, term, ns_coord_act_df)
+                if len(weighted_means) == 0:
+                    self.term[term]['aba_void_indices'].append(irow)
+                else:
+                    act_coeff = np.sum(weighted_means) / np.sum(weight)
+                    self.term[term]['ns_act_vector'].append(act_coeff)
 
     @preprint('This may take a few minutes...')
     def _sphere_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii, smoothing='gaussian'):
