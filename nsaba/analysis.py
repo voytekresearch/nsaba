@@ -5,19 +5,21 @@ Author: Simon Haxby
 """
 
 from nsaba import Nsaba
-from nsaba import get_gene_info
+from nsaba import get_gene_info, load_gene_file
 from nsabatools import preprint, not_operational
+
 import random
 import collections
-from scipy import stats
-import numpy as np
-import seaborn as sns
-import matplotlib.pyplot as plt
-from sklearn.cluster import KMeans
-from sklearn import mixture
 import csv
 import time
+
+import numpy as np
 import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from scipy import stats
+from sklearn.cluster import KMeans
+from sklearn import mixture
 
 
 def cohen_d(x1, x2, n1, n2):
@@ -193,7 +195,7 @@ class NsabaAnalysis(object):
             raise ValueError("graphops parameter '%s' not recognized" % graphops)
 
     @preprint('This may take a couple of minutes ...')
-    def t_test_multi(self, term, quant=None, sample_num=None, split_method='var', genes_of_interest=None):
+    def t_test_multi(self, gi_csv_path, nih_only, term, quant=None, sample_num=None, split_method='var', genes_of_interest=None, **kwargs):
         if term not in self.no.term:
             raise ValueError("Term activation not generated for '%s" % term)
         if sample_num == None:
@@ -205,7 +207,20 @@ class NsabaAnalysis(object):
 
         if len(self.no.ge) < sample_num:
             raise ValueError("Sample number exceeds stored number of Entrez IDs")
+
+        # Use parameters nih_only=True and use gi_csv_path='..' to specify path to 'gene_info.csv'
         sam_ids = random.sample(self.no.ge.keys(), sample_num)
+        if 'nih_only' in kwargs:
+            if kwargs['nih_only']:
+                if 'gi_csv_path' in kwargs:
+                    gi_path = kwargs['gi_csv_path']
+                    df = load_gene_file(gi_path)
+                else:
+                    df = load_gene_file()
+                nih_ids = df['entrez'].as_matrix()
+                sam_ids = [entrez_id for entrez_id in nih_ids if entrez_id in nih_ids]
+                print "Using NIH described genes only; sample size now %d" % (len(sam_ids))
+
         ge_mat = self.no.make_ge_ns_mat(term, sam_ids).T[:-1]
         term_act_vector = self.no.make_ge_ns_mat(term, sam_ids).T[-1:][0]
 

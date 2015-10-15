@@ -6,6 +6,8 @@ database.
 Author: Torben Noto
 """
 
+import pandas as pd
+
 def gene_info(eid):
     """Pulls gene data based on Entrez ID from the NIH and returns summary"""
     if isinstance(eid, str):
