@@ -19,9 +19,27 @@ from nsabatools import not_operational, preprint
 
 
 class NsabaBase(object):
-    """Contains essential base data structures and methods which derived
-    Nsaba classes all depend upon"""
+    """
+    Contains essential base data structures and methods which derived
+    Nsaba classes all depend upon.
 
+    Fields
+    ------
+    aba : Contains panda.Dataframe objects representating the
+        structure of MicroarrayExpression.CSV, SampleAnnot.csv and Probes.CSV
+        (default names), as well as numpy.array representing the MNI coordinates
+        of each location sampled by ABA.
+
+    ns : Contains pandas.DataFrame objects representating Neurosynth's
+        database.txt and features.txt CSV-style fields.
+
+    Methods
+    -------
+    aba_load()
+    ns_load()
+    ns_load_id_dict()
+
+    """
     aba = {
         'exp_df': None,
         'probe_df': None,
@@ -36,9 +54,20 @@ class NsabaBase(object):
 
     @classmethod
     @preprint('This may take a minute or two ...')
-    def aba_load(cls, aba_root=".", using_aba_files=False,
-                 aba_files=['normalized_microarray_donor9861'], csv_names=None):
-        """Initialization of 'aba' dictionary"""
+    def aba_load(cls, aba_path=".", csv_names=None):
+        """
+        Initialization of aba dictionary
+
+        Parameters
+        ----------
+        aba_path : string, optional
+                Root directory of ABA files (defaultly named) MicroarrayExpression.csv,
+                SampleAnnot.csv and Probes.txt.
+        csv_names: tuple-like, optional
+                Tuple specifying alternative names for MicroarrayExpression.csv, SampleAnnot.txt
+                and Probes.txt. (NOTE: order affects aba instantiation).
+                Default = ('MicroarrayExpression.csv', 'SampleAnnot.csv', 'Probes.txt').
+        """
 
         if not csv_names:
             csv_names = [
@@ -49,42 +78,21 @@ class NsabaBase(object):
         if len(csv_names) != 3:
             raise IndexError("'csv_names' must a list of 3 'str' variables")
 
-        for aba_file in aba_files:
-            print 'Initializing gene data from %s' % aba_file
-            if using_aba_files:
-                aba_path = aba_root+aba_file
-            else:
-                aba_path = aba_root
-            csv_path = os.path.join(aba_path, csv_names[1])
-            try:
-                len(cls.aba['si_df'])
-                cls.aba['si_df'].append(pd.read_csv(csv_path))
-                print '%s appended.' % csv_names[1]
-            except TypeError:
-                cls.aba['si_df'] = pd.read_csv(csv_path)
-                print '%s loaded.' % csv_names[1]
+        csv_path = os.path.join(aba_path, csv_names[1])
+        cls.aba['si_df'] = pd.read_csv(csv_path)
+        print '%s loaded.' % csv_names[1]
 
-            csv_path = os.path.join(aba_path, csv_names[0])
-            try:
-                len(cls.aba['exp_df'])
-                cls.aba['exp_df'].append(pd.read_csv(csv_path, header=None))
-                print '%s appended.' % csv_names[0]
-            except TypeError:
-                cls.aba['exp_df'] = pd.read_csv(csv_path, header=None)
-                print '%s loaded.' % csv_names[0]
+        csv_path = os.path.join(aba_path, csv_names[0])
+        cls.aba['exp_df'] = pd.read_csv(csv_path, header=None)
+        print '%s loaded.' % csv_names[0]
 
-            cls.aba['exp_df'].columns = list(
-                itertools.chain.from_iterable(
-                    [['probe_id'], range(cls.aba['si_df'].shape[0])]))
+        cls.aba['exp_df'].columns = list(
+            itertools.chain.from_iterable(
+                [['probe_id'], range(cls.aba['si_df'].shape[0])]))
 
-            csv_path = os.path.join(aba_path, csv_names[2])
-            try:
-                len(cls.aba['probe_df'])
-                cls.aba['probe_df'].append(pd.read_csv(csv_path))
-                print '%s appended.' % csv_names[2]
-            except TypeError:
-                cls.aba['probe_df'] = pd.read_csv(csv_path)
-                print '%s loaded.' % csv_names[2]
+        csv_path = os.path.join(aba_path, csv_names[2])
+        cls.aba['probe_df'] = pd.read_csv(csv_path)
+        print '%s loaded.' % csv_names[2]
 
         mni_coords = cls.aba['si_df'].loc[:, 'mni_x':'mni_z'].as_matrix().astype(float)
         cls.aba['mni_coords'] = spatial.KDTree(mni_coords)
@@ -93,10 +101,20 @@ class NsabaBase(object):
     @classmethod
     @preprint('This may take a minute or two ...')
     def ns_load(cls, ns_path=".", ns_files=None):
-        """Initialization of 'ns' dictionary"""
+        """
+        Initialization of ns dictionary
+
+        Parameters
+        ----------
+        ns_path : string, optional
+                Root directory of neurosynth files (defaultly named) database.txt and features.txt.
+        ns_files : tuple-like, optional
+                Tuple specifying alternative names for database.txt and features.txt
+                (NOTE: order affects ns instantiation). Default = ('database.txt', 'features.txt').
+        """
 
         if not ns_files:
-            ns_files = ['database.txt', 'features.txt']
+            ns_files = ('database.txt', 'features.txt')
 
         df = pd.read_table(os.path.join(ns_path, ns_files[0]))
         cls.ns['database_df'] = df.loc[df.space == 'MNI', ['id', 'x', 'y', 'z']]
@@ -128,16 +146,18 @@ class NsabaBase(object):
                 c += 1
 
     def _check_static_members(self):
+        """ Ensures Nsaba class is not instantiated without initalizing NsabaBase.aba and NsabaBase.ns."""
         for val in self.aba.itervalues():
             if val is None:
-                raise NotImplementedError("Unassigned Nsaba 'aba' static variable: see Nsaba.aba_load(path)")
+                raise AttributeError("Unassigned Nsaba 'aba' static variable: see Nsaba.aba_load(path)")
         for val in self.ns.itervalues():
             if val is None:
-                raise NotImplementedError("Unassigned Nsaba 'ns' static variable: see Nsaba.ns_load(path)")
+                raise AttributeError("Unassigned Nsaba 'ns' static variable: see Nsaba.ns_load(path)")
 
 
 class Nsaba(NsabaBase):
-    """ Main Nsaba class. Contains methods data fetching, estimation and organization."""
+    """
+    Main Nsaba class. Contains methods data fetching, estimation and organization."""
 
     def __init__(self):
         self._check_static_members()
