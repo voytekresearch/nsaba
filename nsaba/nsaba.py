@@ -39,6 +39,9 @@ class NsabaBase(object):
     ns_load()
     ns_load_id_dict()
 
+    WARNING: NsabaBase is not meant to instantiated explicitly, only Nsaba should
+    be publicly interfaced.
+
     """
     aba = {
         'exp_df': None,
@@ -157,7 +160,26 @@ class NsabaBase(object):
 
 class Nsaba(NsabaBase):
     """
-    Main Nsaba class. Contains methods data fetching, estimation and organization."""
+    Main Nsaba class. Contains methods data fetching, estimation and organization.
+
+    Methods
+    -------
+    get_aba_ge()
+    pickle_ge()
+    load_ge_pickle()
+    is_gene()
+    is_term()
+    is_id()
+    coords_to_ge
+    coords_to_ids()
+    coord_to_terms()
+    coords_to_terms()
+    term_to_coords()
+    get_ns_act()
+    make_ge_ns_mat()
+    set_ns_weight_f()
+
+    """
 
     def __init__(self):
         self._check_static_members()
@@ -215,8 +237,7 @@ class Nsaba(NsabaBase):
         else:
             return False
 
-    #  @not_operational
-    #  added layer because id mismatches between dataframes
+    @not_operational
     def is_id(self, study_id):
         """Checks if ID is registered """
         if any(self.ns['features_df']['pmid'] == study_id):
@@ -256,6 +277,37 @@ class Nsaba(NsabaBase):
             return term_vector_off_by_1[1:]
         else:
             return 'Invalid study id'
+
+    def _coord_to_ge(self, coord, entrez_ids, search_radii=3, k=20):
+        """Returns weighted ABA gene expression mean for some MNI coordinate based
+        on a list of passed Entrez IDs"""
+        self.__check_entrez_struct(entrez_ids)
+
+        ge_for_coord = 0
+        for entrez_id in entrez_ids:
+            coord_inds, radii = self._knn_search(coord, self.aba['mni_coords'], search_radii, k)
+            if len(coord_inds) == 0:
+                # print "No ABA coordinates are within search radius of specified coordinate"
+                break
+            weight = self.__ns_weight_f(radii)
+            local_ge = self.ge[entrez_id][coord_inds]
+            weighted_ge_mean = np.sum(local_ge*weight)/np.sum(weight)
+            ge_for_coord = weighted_ge_mean
+
+        return ge_for_coord
+
+    def coords_to_ge(self, coords, entrez_ids, search_radii=3, k=20):
+        """Returns Returns weighted ABA gene expression mean for a list MNI coordinate based
+        on a list of passed Entrez IDs"""
+        self.__check_entrez_struct(entrez_ids)
+
+        ge_for_coords = []
+        for coord in coords:
+            ge_for_coord = self._coord_to_ge(coord, entrez_ids, search_radii, k)
+            if ge_for_coords > 0:
+                ge_for_coords.append(ge_for_coord)
+
+        return np.array(ge_for_coords)
 
     def coord_to_terms(self, coord):
         ids = self.coord_to_ids(coord)
@@ -473,63 +525,9 @@ class Nsaba(NsabaBase):
             print "Either term['%s'] or one or more Entrez ID keys does not exist; please check arguments" \
                   % ns_term
 
-    def _coord_to_ge(self, coord, entrez_ids, search_radii=3, k=20):
-        """Returns weighted ABA gene expression mean for some MNI coordinate based
-        on a list of passed Entrez IDs"""
-        self.__check_entrez_struct(entrez_ids)
-
-        ge_for_coord = 0
-        for entrez_id in entrez_ids:
-            coord_inds, radii = self._knn_search(coord, self.aba['mni_coords'], search_radii, k)
-            if len(coord_inds) == 0:
-                # print "No ABA coordinates are within search radius of specified coordinate"
-                break
-            weight = self.__ns_weight_f(radii)
-            local_ge = self.ge[entrez_id][coord_inds]
-            weighted_ge_mean = np.sum(local_ge*weight)/np.sum(weight)
-            ge_for_coord = weighted_ge_mean
-
-        return ge_for_coord
-
-    def coords_to_ge(self, coords, entrez_ids, search_radii=3, k=20):
-        """Returns Returns weighted ABA gene expression mean for a list MNI coordinate based
-        on a list of passed Entrez IDs"""
-        self.__check_entrez_struct(entrez_ids)
-
-        ge_for_coords = []
-        for coord in coords:
-            ge_for_coord = self._coord_to_ge(coord, entrez_ids, search_radii, k)
-            if ge_for_coords > 0:
-                ge_for_coords.append(ge_for_coord)
-
-        return np.array(ge_for_coords)
-
     def set_ns_weight_f(self, f):
         try:
             print "Test: f(e) = %.2f" % f(np.e)
             self.__ns_weight_f = f
         except TypeError:
             print "'f' is improper, ensure 'f' receives only one parameter and returns a numeric type"
-
-
-def load_gene_file(path='.'):
-    if isinstance(path, str):
-        gene_file = path+'gene_info.csv'
-        df = pd.read_csv(gene_file)
-        return df
-    else:
-        raise TypeError("gene no must be a string")
-
-
-def get_gene_info(path, gene_ids):
-    df = load_gene_file(path)
-    output = []
-    for gene_id in gene_ids:
-        if isinstance(gene_id, str):
-            if int(gene_id) in df['Entrez']:
-                output.append((df[df['Entrez'] == int(gene_id)].as_matrix()[0]))
-            else:
-                print 'Gene '+gene_id+' not found in NIH database'
-        else:
-            print str(gene_id)+' must be a str'
-    re
