@@ -25,12 +25,12 @@ class NsabaBase(object):
 
     Fields
     ------
-    aba : Contains panda.Dataframe objects representating the
+    _aba : Contains panda.Dataframe objects representating the
         structure of MicroarrayExpression.CSV, SampleAnnot.csv and Probes.CSV
         (default names), as well as numpy.array representing the MNI coordinates
         of each location sampled by ABA.
 
-    ns : Contains pandas.DataFrame objects representating Neurosynth's
+    _ns : Contains pandas.DataFrame objects representating Neurosynth's
         database.txt and features.txt CSV-style fields.
 
     Methods
@@ -43,14 +43,14 @@ class NsabaBase(object):
     be publicly interfaced.
 
     """
-    aba = {
+    _aba = {
         'exp_df': None,
         'probe_df': None,
         'si_df': None,
         'mni_coords': None
     }
 
-    ns = {
+    _ns = {
         'database_df': None,
         'features_df': None,
     }
@@ -82,23 +82,23 @@ class NsabaBase(object):
             raise IndexError("'csv_names' must a list of 3 'str' variables")
 
         csv_path = os.path.join(aba_path, csv_names[1])
-        cls.aba['si_df'] = pd.read_csv(csv_path)
+        cls._aba['si_df'] = pd.read_csv(csv_path)
         print '%s loaded.' % csv_names[1]
 
         csv_path = os.path.join(aba_path, csv_names[0])
-        cls.aba['exp_df'] = pd.read_csv(csv_path, header=None)
+        cls._aba['exp_df'] = pd.read_csv(csv_path, header=None)
         print '%s loaded.' % csv_names[0]
 
-        cls.aba['exp_df'].columns = list(
+        cls._aba['exp_df'].columns = list(
             itertools.chain.from_iterable(
-                [['probe_id'], range(cls.aba['si_df'].shape[0])]))
+                [['probe_id'], range(cls._aba['si_df'].shape[0])]))
 
         csv_path = os.path.join(aba_path, csv_names[2])
-        cls.aba['probe_df'] = pd.read_csv(csv_path)
+        cls._aba['probe_df'] = pd.read_csv(csv_path)
         print '%s loaded.' % csv_names[2]
 
-        mni_coords = cls.aba['si_df'].loc[:, 'mni_x':'mni_z'].as_matrix().astype(float)
-        cls.aba['mni_coords'] = spatial.KDTree(mni_coords)
+        mni_coords = cls._aba['si_df'].loc[:, 'mni_x':'mni_z'].as_matrix().astype(float)
+        cls._aba['mni_coords'] = spatial.KDTree(mni_coords)
         print "Nsaba.aba['mni_coords'] initialized.\n"
 
     @classmethod
@@ -120,40 +120,40 @@ class NsabaBase(object):
             ns_files = ('database.txt', 'features.txt')
 
         df = pd.read_table(os.path.join(ns_path, ns_files[0]))
-        cls.ns['database_df'] = df.loc[df.space == 'MNI', ['id', 'x', 'y', 'z']]
+        cls._ns['database_df'] = df.loc[df.space == 'MNI', ['id', 'x', 'y', 'z']]
         print "%s loaded." % ns_files[0]
 
-        cls.ns['features_df'] = pd.read_table(os.path.join(ns_path, ns_files[1]))
+        cls._ns['features_df'] = pd.read_table(os.path.join(ns_path, ns_files[1]))
         print "%s loaded." % ns_files[1]
 
-        mni_coords = cls.ns['database_df'].loc[:, 'x':'z'].as_matrix().astype(float)
-        cls.ns['mni_coords'] = spatial.KDTree(mni_coords)
+        mni_coords = cls._ns['database_df'].loc[:, 'x':'z'].as_matrix().astype(float)
+        cls._ns['mni_coords'] = spatial.KDTree(mni_coords)
         print "Nsaba.ns['mni_coords'] initialized.\n"
 
     @classmethod
     @preprint('This may take a minute or two ...')
     def ns_load_id_dict(cls):
         """ID dictionary thing needed for doing some NS analyses"""
-        cls.ns['id_dict'] = {}
+        cls._ns['id_dict'] = {}
         c = 0
-        for i in cls.ns['database_df'].loc[:, 'id']:
-            if i not in cls.ns['id_dict']:
-                cls.ns['id_dict'][i] = [(np.floor(cls.ns['database_df']['x'].iloc[c]),
-                                         np.floor(cls.ns['database_df']['y'].iloc[c]),
-                                         np.floor(cls.ns['database_df']['z'].iloc[c]))]
+        for i in cls._ns['database_df'].loc[:, 'id']:
+            if i not in cls._ns['id_dict']:
+                cls._ns['id_dict'][i] = [(np.floor(cls._ns['database_df']['x'].iloc[c]),
+                                         np.floor(cls._ns['database_df']['y'].iloc[c]),
+                                         np.floor(cls._ns['database_df']['z'].iloc[c]))]
                 c += 1
             else:
-                cls.ns['id_dict'][i].append((np.floor(cls.ns['database_df']['x'].iloc[c]),
-                                             np.floor(cls.ns['database_df']['y'].iloc[c]),
-                                             np.floor(cls.ns['database_df']['z'].iloc[c])))
+                cls._ns['id_dict'][i].append((np.floor(cls._ns['database_df']['x'].iloc[c]),
+                                             np.floor(cls._ns['database_df']['y'].iloc[c]),
+                                             np.floor(cls._ns['database_df']['z'].iloc[c])))
                 c += 1
 
     def _check_static_members(self):
         """ Ensures Nsaba class is not instantiated without initalizing NsabaBase.aba and NsabaBase.ns."""
-        for val in self.aba.itervalues():
+        for val in self._aba.itervalues():
             if val is None:
                 raise AttributeError("Unassigned Nsaba 'aba' static variable: see Nsaba.aba_load(path)")
-        for val in self.ns.itervalues():
+        for val in self._ns.itervalues():
             if val is None:
                 raise AttributeError("Unassigned Nsaba 'ns' static variable: see Nsaba.ns_load(path)")
 
@@ -182,13 +182,23 @@ class Nsaba(NsabaBase):
     """
 
     def __init__(self):
+        """Nsaba init method; terminates instantiation if Nsaba.ns or Nsaba.aba are not loaded."""
         self._check_static_members()
         self.ge = {}
         self.term = {}
         self.__ns_weight_f = lambda r: 1. / r ** 2
 
     def __check_entrez_struct(self, entrez_ids):
-        """Checks if 'entrez_ids' parameter is an non-str iterable"""
+        """
+        Checks if 'entrez_ids' parameter is an non-str iterable; type-checking method.
+        Raises errors if entrez_ids is not as specified above; ensures that methods and
+        data structures use 'entrez_ids' are well-behaved.
+
+        Parameters
+        ----------
+        entrez_ids: List-like
+            list-like structure containing NIH Entrez IDs.
+        """
         try:
             iter(entrez_ids)
         except TypeError:
@@ -198,41 +208,77 @@ class Nsaba(NsabaBase):
                 raise TypeError("Invalid parameter form; please contain entrez ids in iterable container")
 
     def get_aba_ge(self, entrez_ids):
-        """Retrieves an stores gene expression coefficients in ABA dictionary based on a
-        a passed list of Entrez IDs"""
+        """
+        Retrieves and stores gene expression coefficients in ABA dictionary based on a
+        a passed list of NIH Entrez IDs.
+
+        Parameters
+        ----------
+        entrez_ids: List-like
+            list-like structure containing NIH Entrez IDs.
+        """
 
         self.__check_entrez_struct(entrez_ids)
 
         for entrez_id in entrez_ids:
-            probe_ids = self.aba['probe_df'].loc[self.aba['probe_df']['entrez_id']
+            # Fetch probe IDs for Entrez ID
+            probe_ids = self._aba['probe_df'].loc[self._aba['probe_df']['entrez_id']
                                                  == entrez_id]['probe_id'].tolist()
 
             if len(probe_ids) == 0:
                 print 'Entrez ID: %s not registered with ABA database' % entrez_id
                 continue
 
-            ge_df = self.aba['exp_df'].loc[self.aba['exp_df']['probe_id'].isin(probe_ids)]
+            # Return gene expression on given probes across sampled locations.
+            ge_df = self._aba['exp_df'].loc[self._aba['exp_df']['probe_id'].isin(probe_ids)]
             ge_mat = ge_df.as_matrix().astype(float)[:, 1:].T
+
+            # Take average gene expression across probes at a given sampled location.
+            # Q!: Alternative scheme?
             self.ge[entrez_id] = np.mean(ge_mat, axis=1)
 
     def pickle_ge(self, pkl_file="Nsaba_ABA_ge.pkl", output_dir='.'):
+        """
+        Stores Nsaba.ge as pickle named by 'pkl_file' in directory 'output_dir'.
+
+        Parameters
+        ----------
+        pkl_file: string, optional
+            Name of pickle file.
+        output_dir: string, optional
+            Name of directory the pickle is to be written to;
+            '/' automatically added via os.path.join.
+
+        """
         pickle.dump(self.ge, open(os.path.join(output_dir, pkl_file), 'wb'))
         print "%s successfully created" % pkl_file
 
     @preprint('This may take a minute or two ...')
     def load_ge_pickle(self, pkl_file="Nsaba_ABA_ge.pkl", path='.'):
+        """
+        Loads pickle named by 'pkl_file' in directory 'output_dir' into Nsaba.ge.
+
+        Parameters
+        ----------
+        pkl_file: string, optional
+            Name of pickle file.
+        path: string, optional
+            Path to directory the pickle is written to;
+            '/' automatically added via os.path.join.
+
+        """
         self.ge = pickle.load(open(os.path.join(path, pkl_file), 'rb'))
         print "'ge' dictionary successfully loaded"
 
     def is_gene(self, gene):
-        if gene in self.aba['probe_df']['entrez_id']:
+        if gene in self._aba['probe_df']['entrez_id']:
             return True
         else:
             return False
 
     def is_term(self, term):
         """Checks if this term is in the neurosynth database """
-        if term in self.ns['features_df'].columns:
+        if term in self._ns['features_df'].columns:
             return True
         else:
             return False
@@ -240,15 +286,15 @@ class Nsaba(NsabaBase):
     @not_operational
     def is_id(self, study_id):
         """Checks if ID is registered """
-        if any(self.ns['features_df']['pmid'] == study_id):
-            if any(self.ns['database_df']['id'] == study_id):
+        if any(self._ns['features_df']['pmid'] == study_id):
+            if any(self._ns['database_df']['id'] == study_id):
                 return True
         else:
             return False
 
     def is_coord(self, coordinate):
         """Checks if an x,y,z coordinate in list form matches a NS data point"""
-        zipped_coordinates = np.squeeze(zip(self.ns['mni_coords'].data))
+        zipped_coordinates = np.squeeze(zip(self._ns['mni_coords'].data))
         for this_coordinate in zipped_coordinates:
             if this_coordinate[0] == coordinate[0]:
                 if this_coordinate[1] == coordinate[1]:
@@ -259,7 +305,7 @@ class Nsaba(NsabaBase):
     def coord_to_ids(self, coordinate):
         """Uses the study dictionary above to find study ids from x,y,z coordinates """
         ids = []
-        for i, coords in self.ns['id_dict'].items():
+        for i, coords in self._ns['id_dict'].items():
             for this_coordinate in coords:
                 if this_coordinate[0] == coordinate[0]:
                     if this_coordinate[1] == coordinate[1]:
@@ -272,7 +318,7 @@ class Nsaba(NsabaBase):
     def _id_to_terms(self, study_id):
         """Finds all of the term heat values of a given ID """
         if self.is_id(study_id):
-            term_vector_off_by_1 = np.squeeze(self.ns['features_df'].loc[self.ns['features_df']['pmid'] == study_id].as_matrix())
+            term_vector_off_by_1 = np.squeeze(self._ns['features_df'].loc[self._ns['features_df']['pmid'] == study_id].as_matrix())
             # shifting to remove id index from vector
             return term_vector_off_by_1[1:]
         else:
@@ -285,7 +331,7 @@ class Nsaba(NsabaBase):
 
         ge_for_coord = 0
         for entrez_id in entrez_ids:
-            coord_inds, radii = self._knn_search(coord, self.aba['mni_coords'], search_radii, k)
+            coord_inds, radii = self._knn_search(coord, self._aba['mni_coords'], search_radii, k)
             if len(coord_inds) == 0:
                 # print "No ABA coordinates are within search radius of specified coordinate"
                 break
@@ -329,10 +375,10 @@ class Nsaba(NsabaBase):
         # only uses knn
         if self.is_term(term):
             try:
-                self.ns['id_dict']
+                self._ns['id_dict']
             except KeyError:
                 self.ns_load_id_dict()
-            term_index = self.ns['features_df'].columns.get_loc(term)
+            term_index = self._ns['features_df'].columns.get_loc(term)
             term_vector = np.zeros((1, len(coords)))
             c = 0
             for coord in coords:
@@ -341,8 +387,8 @@ class Nsaba(NsabaBase):
                     term_vector[0, c] = temp_term[term_index]
                     c += 1
                 else:
-                    r, inds = self.ns['mni_coords'].query(coord, search_radii)
-                    temp_coords = self.ns['mni_coords'].data[inds]
+                    r, inds = self._ns['mni_coords'].query(coord, search_radii)
+                    temp_coords = self._ns['mni_coords'].data[inds]
                     weight = 1./r**2
                     term_acts = []
 
@@ -358,25 +404,25 @@ class Nsaba(NsabaBase):
     def term_to_coords(self, term, no_ids=3):
         if term in self.term:
             try:
-                self.ns['id_dict'][24379394]
+                self._ns['id_dict'][24379394]
             except KeyError:
                 self.ns_load_id_dict()
-            heat = self.ns['features_df'][term]
+            heat = self._ns['features_df'][term]
             sorted_heat_vals = sorted(enumerate(heat), key=lambda x: x[1], reverse=True)[0:no_ids]
             inds = zip(*sorted_heat_vals)[0]
-            pmids = [self.ns['features_df']['pmid'].ix[ind] for ind in inds]
+            pmids = [self._ns['features_df']['pmid'].ix[ind] for ind in inds]
             coords = []
             for pmid in pmids:
                 if self.is_id(pmid):
-                    coords.append(self.ns['id_dict'][pmid])
+                    coords.append(self._ns['id_dict'][pmid])
             return np.squeeze(coords)
 
     def _term_to_coords(self, term, thresh=0):
         """Finds coordinates associated with a given term.
         Returns NS coordinate tree and ID/coordinate/activation DataFrame"""
-        term_ids_act = self.ns['features_df'].loc[self.ns['features_df'][term] > thresh, ['pmid', term]]
+        term_ids_act = self._ns['features_df'].loc[self._ns['features_df'][term] > thresh, ['pmid', term]]
         term_ids = term_ids_act['pmid'].tolist()
-        term_coords = self.ns['database_df'].loc[self.ns['database_df']['id'].isin(term_ids)]
+        term_coords = self._ns['database_df'].loc[self._ns['database_df']['id'].isin(term_ids)]
         try:
             ns_coord_tree = spatial.KDTree(term_coords.loc[:, 'x':'z'].as_matrix().astype(float))
         except ValueError:
@@ -421,7 +467,7 @@ class Nsaba(NsabaBase):
     @preprint('This may take a few minutes...')
     def _knn_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii, k, smoothing='gaussian'):
         """KNN method """
-        for irow, xyz in enumerate(self.aba['mni_coords'].data):
+        for irow, xyz in enumerate(self._aba['mni_coords'].data):
             coord_inds, radii = self._knn_search(xyz, ns_coord_tree, search_radii, k)
             coords = ns_coord_tree.data[coord_inds]
 
@@ -463,7 +509,7 @@ class Nsaba(NsabaBase):
     @preprint('This may take a few minutes...')
     def _sphere_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii, smoothing='gaussian'):
         """Sphere buckets method"""
-        for irow, xyz in enumerate(self.aba['mni_coords'].data):
+        for irow, xyz in enumerate(self._aba['mni_coords'].data):
             sphere_bucket = self._sphere(xyz, ns_coord_tree, search_radii)
             sphere_vals = [0, 0]
             for w, bucket in enumerate(sphere_bucket):
@@ -516,7 +562,7 @@ class Nsaba(NsabaBase):
         if ns_term in self.term and all([key in self.ge for key in entrez_ids]):
             ge_ns_mat = []
             for entrez_id in entrez_ids:
-                aba_indices = np.array([i for i in xrange(len(self.aba['mni_coords'].data))
+                aba_indices = np.array([i for i in xrange(len(self._aba['mni_coords'].data))
                                         if i not in self.term[ns_term]['aba_void_indices']])
                 ge_ns_mat.append(self.ge[entrez_id][aba_indices])
             ge_ns_mat.append(self.term[ns_term]['ns_act_vector'])
