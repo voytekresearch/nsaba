@@ -183,6 +183,7 @@ class Nsaba(NsabaBase):
 
     def __init__(self):
         """Nsaba init method; terminates instantiation if Nsaba.ns or Nsaba.aba are not loaded."""
+
         self._check_static_members()
         self.ge = {}
         self.term = {}
@@ -199,6 +200,7 @@ class Nsaba(NsabaBase):
         entrez_ids: List-like
             list-like structure containing NIH Entrez IDs.
         """
+
         try:
             iter(entrez_ids)
         except TypeError:
@@ -248,8 +250,8 @@ class Nsaba(NsabaBase):
         output_dir: string, optional
             Name of directory the pickle is to be written to;
             '/' automatically added via os.path.join.
-
         """
+
         pickle.dump(self.ge, open(os.path.join(output_dir, pkl_file), 'wb'))
         print "%s successfully created" % pkl_file
 
@@ -265,19 +267,34 @@ class Nsaba(NsabaBase):
         path: string, optional
             Path to directory the pickle is written to;
             '/' automatically added via os.path.join.
-
         """
+
         self.ge = pickle.load(open(os.path.join(path, pkl_file), 'rb'))
         print "'ge' dictionary successfully loaded"
 
     def is_gene(self, gene):
+        """
+        Parameters
+        ----------
+        gene: int
+            Checks whether gene is a registered NIH Entrez ID within ABA.
+        """
+
+        if isinstance(gene, str):
+            raise ValueError("%s is a string; please pass as a numeric." % gene)
         if gene in self._aba['probe_df']['entrez_id']:
             return True
         else:
             return False
 
     def is_term(self, term):
-        """Checks if this term is in the neurosynth database """
+        """
+        Parameters
+        ----------
+        term: string
+            Checks if this term is in the NS term database.
+        """
+
         if term in self._ns['features_df'].columns:
             return True
         else:
@@ -293,36 +310,66 @@ class Nsaba(NsabaBase):
             return False
 
     def is_coord(self, coordinate):
-        """Checks if an x,y,z coordinate in list form matches a NS data point"""
-        zipped_coordinates = np.squeeze(zip(self._ns['mni_coords'].data))
-        for this_coordinate in zipped_coordinates:
-            if this_coordinate[0] == coordinate[0]:
-                if this_coordinate[1] == coordinate[1]:
-                    if this_coordinate[2] == coordinate[2]:
-                        return True
-        return False
+        """
+        Parameters
+        ----------
+        term: tuple-like (3)
+            Checks if an (x,y,z) coordinate matches an NS data point.
+        """
+
+        if len(coordinate) == 3 and ~isinstance(coordinate, str):
+            zipped_coordinates = np.squeeze(zip(self._ns['mni_coords'].data))
+            for this_coordinate in zipped_coordinates:
+                if this_coordinate == coordinate:
+                    return True
+                else:
+                    return False
+        else:
+            raise ValueError("Argument form improper; check function documentation.")
 
     def coord_to_ids(self, coordinate):
-        """Uses the study dictionary above to find study ids from x,y,z coordinates """
+        """
+        Uses the study dictionary above to find study ids from x,y,z coordinates.
+
+        Parameters
+        ----------
+        coordinate: tuple-like (3)
+            Checks if an (x,y,z) coordinate matches an NS data point.
+         """
+
+        try:
+            self._ns['id_dict']
+        except KeyError:
+            raise NameError("id_dict not initialized; see/call NsabaBase.ns_load_id_dict()")
+
         ids = []
-        for i, coords in self._ns['id_dict'].items():
-            for this_coordinate in coords:
-                if this_coordinate[0] == coordinate[0]:
-                    if this_coordinate[1] == coordinate[1]:
-                        if this_coordinate[2] == coordinate[2]:
-                            if i not in ids:
-                                if self.is_id(i):
-                                    ids.append(i)
-        return ids
+        if len(coordinate) == 3 and ~isinstance(coordinate, str):
+            for i, coords in self._ns['id_dict'].items():
+                for this_coordinate in coords:
+                    if this_coordinate == coordinate:
+                        if i not in ids:
+                            if self.is_id(i):
+                                ids.append(i)
+            return ids
+        else:
+            raise ValueError("Argument form improper; check function documentation.")
 
     def _id_to_terms(self, study_id):
-        """Finds all of the term heat values of a given ID """
+        """
+        Returns activations for all terms for a given study.
+
+        Parameters
+        ----------
+        study_id: int
+            int representing a paper/study in the NS framework.
+        """
         if self.is_id(study_id):
-            term_vector_off_by_1 = np.squeeze(self._ns['features_df'].loc[self._ns['features_df']['pmid'] == study_id].as_matrix())
+            term_vector_off_by_1 = np.squeeze(self._ns['features_df'].loc[self._ns['features_df']['pmid']
+                                                                          == study_id].as_matrix())
             # shifting to remove id index from vector
             return term_vector_off_by_1[1:]
         else:
-            return 'Invalid study id'
+            raise ValueError("Invalid NS study ID; check 'study_id' parameter")
 
     def _coord_to_ge(self, coord, entrez_ids, search_radii=3, k=20):
         """Returns weighted ABA gene expression mean for some MNI coordinate based
