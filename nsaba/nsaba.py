@@ -164,6 +164,8 @@ class Nsaba(NsabaBase):
 
     Methods
     -------
+    get_ns_struct
+    get_aba_struct
     get_aba_ge()
     pickle_ge()
     load_ge_pickle()
@@ -188,6 +190,48 @@ class Nsaba(NsabaBase):
         self.ge = {}
         self.term = {}
         self.__ns_weight_f = lambda r: 1. / r ** 2
+
+    def get_ns_struct(self, key=None):
+        """
+        Returns _ns internal Dictionary or specified sub-structure.
+        See class documentation for more information.
+
+        Parameters
+        ----------
+        key: string, optional
+            Name of specified sub-structure of _ns if provided;
+            else _ns dictionary is returned.
+        """
+
+        if not key:
+            return self._ns
+        else:
+            try:
+                return self._ns[key]
+            except KeyError:
+                opts = " / ".join(self._ns.keys())
+                raise KeyError("'key' argument invalid; options are: %s" % opts)
+
+    def get_aba_struct(self, key=None):
+        """
+        Returns _aba internal dictionary or specified sub-structure.
+        See class documentation for more information.
+
+        Parameters
+        ----------
+        key: string, optional
+            Name of specified sub-structure of _aba if provided;
+            else _ns dictionary is returned.
+       """
+
+        if not key:
+            return self._aba
+        else:
+            try:
+                return self._aba[key]
+            except KeyError:
+                opts = " / ".join(self._aba.keys())
+                raise KeyError("'key' argument invalid; options are: %s" % opts)
 
     def __check_entrez_struct(self, entrez_ids):
         """
@@ -300,12 +344,16 @@ class Nsaba(NsabaBase):
         else:
             return False
 
-    @not_operational
     def is_id(self, study_id):
-        """Checks if ID is registered """
-        if any(self._ns['features_df']['pmid'] == study_id):
-            if any(self._ns['database_df']['id'] == study_id):
-                return True
+        """
+        Parameters
+        ----------
+        study_id: int
+            Checks if study_id is a registered NS study ID.
+        """
+        if any(self._ns['features_df'].pmid == study_id) or \
+                any(self._ns['database_df'].id == study_id):
+                    return True
         else:
             return False
 
@@ -314,7 +362,7 @@ class Nsaba(NsabaBase):
         Parameters
         ----------
         term: tuple-like (3)
-            Checks if an (x,y,z) coordinate matches an NS data point.
+            Checks if an (x,y,z) MNI coordinate matches an NS data point.
         """
 
         if len(coordinate) == 3 and ~isinstance(coordinate, str):
@@ -329,18 +377,23 @@ class Nsaba(NsabaBase):
 
     def coord_to_ids(self, coordinate):
         """
-        Uses the study dictionary above to find study ids from x,y,z coordinates.
+        Uses the study dictionary above to find NS study ids from x,y,z coordinates.
 
         Parameters
         ----------
         coordinate: tuple-like (3)
-            Checks if an (x,y,z) coordinate matches an NS data point.
-         """
+            Checks if an MNI (x,y,z) coordinate matches an NS data point.
+
+        Returns
+        -------
+        ids: list (int)
+            NS study IDs that have a data point corresponding to 'coordinate'.
+        """
 
         try:
             self._ns['id_dict']
         except KeyError:
-            raise NameError("id_dict not initialized; see/call NsabaBase.ns_load_id_dict()")
+            raise NameError("Study ID dictionary not initialized; see/call NsabaBase.ns_load_id_dict()")
 
         ids = []
         if len(coordinate) == 3 and ~isinstance(coordinate, str):
@@ -362,21 +415,48 @@ class Nsaba(NsabaBase):
         ----------
         study_id: int
             int representing a paper/study in the NS framework.
+
+        Return
+        ------
+        term_vector_off_by_1[1:]: numpy.array [1 x 3406]
+            Vector of term activations for all terms for a specified NS study.
         """
+
         if self.is_id(study_id):
             term_vector_off_by_1 = np.squeeze(self._ns['features_df'].loc[self._ns['features_df']['pmid']
                                                                           == study_id].as_matrix())
-            # shifting to remove id index from vector
+            # shifting to remove ID index from vector
             return term_vector_off_by_1[1:]
         else:
             raise ValueError("Invalid NS study ID; check 'study_id' parameter")
 
     def _coord_to_ge(self, coord, entrez_ids, search_radii=3, k=20):
-        """Returns weighted ABA gene expression mean for some MNI coordinate based
-        on a list of passed Entrez IDs"""
+        """
+        Returns weighted ABA gene expression statistic for some MNI coordinate based
+        on a list of passed Entrez IDs.
+
+        Parameters
+        ----------
+        coord: tuple-like (3)
+            Reference MNI coordinate.
+        entrez_ids: list-like
+            Entrez IDs for gene expressions to be estimated around 'coord'.
+        search_radii: numeric
+            Max search radii for KNN gene expression estimation technique.
+        k: int
+            k parameter for KNN estimation.
+
+        Returns
+        -------
+        ge_for_coord: list [N]
+            Estimated gene expression at 'coord' for genes specified by 'entrez_ids'.
+            Where N is the size of 'entrez_ids' (number of genes for expression
+            to be estimated).
+
+        """
         self.__check_entrez_struct(entrez_ids)
 
-        ge_for_coord = 0
+        ge_for_coord = []
         for entrez_id in entrez_ids:
             coord_inds, radii = self._knn_search(coord, self._aba['mni_coords'], search_radii, k)
             if len(coord_inds) == 0:
@@ -385,13 +465,32 @@ class Nsaba(NsabaBase):
             weight = self.__ns_weight_f(radii)
             local_ge = self.ge[entrez_id][coord_inds]
             weighted_ge_mean = np.sum(local_ge*weight)/np.sum(weight)
-            ge_for_coord = weighted_ge_mean
+            ge_for_coord.append(weighted_ge_mean)
 
         return ge_for_coord
 
     def coords_to_ge(self, coords, entrez_ids, search_radii=3, k=20):
-        """Returns Returns weighted ABA gene expression mean for a list MNI coordinate based
-        on a list of passed Entrez IDs"""
+        """
+        Returns Returns weighted ABA gene expression statistic for a list MNI coordinate based
+        on a list of passed Entrez IDs
+
+        Parameters
+        ----------
+        coords: list-like
+            List of reference MNI coordinate for gene expression to be estimated at.
+        entrez_ids: list-like
+            Entrez IDs for gene expressions to be estimated around 'coord'.
+        search_radii: numeric
+            Max search radii for KNN gene expression estimation technique.
+        k: int
+            k parameter for KNN estimation.
+
+        Returns
+        -------
+        np.array(ge_coords): numpy.array [M x N]
+            See _coord_to_ge() documentation for more information.
+
+        """
         self.__check_entrez_struct(entrez_ids)
 
         ge_for_coords = []

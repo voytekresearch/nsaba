@@ -15,14 +15,15 @@ class ReadOnlyDict(dict):
             super(ReadOnlyDict, self).__setitem__(key, value)
 
 
-# Uses for methods that may be imported and accidentally used.
 def not_operational(func):
+    """Decorater: Used for methods that may be imported and accidentally used."""
     def func_wrap(*args, **kwargs):
         raise ImportError("'%s': is still in development and not operational." % func.func_name)
     return func_wrap
 
 
 class preprint(object):
+    """Decorater: Prints string prior to executing function."""
     def __init__(self, string):
         self.string = string
 
