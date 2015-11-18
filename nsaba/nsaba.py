@@ -25,12 +25,12 @@ class NsabaBase(object):
 
     Fields
     ------
-    _aba : Contains panda.Dataframe objects representating the
+    __aba : Contains panda.Dataframe objects representating the
         structure of MicroarrayExpression.CSV, SampleAnnot.csv and Probes.CSV
         (default names), as well as numpy.array representing the MNI coordinates
         of each location sampled by ABA.
 
-    _ns : Contains pandas.DataFrame objects representating Neurosynth's
+    __ns : Contains pandas.DataFrame objects representating Neurosynth's
         database.txt and features.txt CSV-style fields.
 
     Methods
@@ -80,6 +80,8 @@ class NsabaBase(object):
 
         if len(csv_names) != 3:
             raise IndexError("'csv_names' must a list of 3 'str' variables")
+        if not isinstance(aba_path, str):
+            raise ValueError("'aba_path' must be a str.")
 
         csv_path = os.path.join(aba_path, csv_names[1])
         cls._aba['si_df'] = pd.read_csv(csv_path)
@@ -118,6 +120,11 @@ class NsabaBase(object):
 
         if not ns_files:
             ns_files = ('database.txt', 'features.txt')
+
+        if len(ns_files) != 2:
+            raise IndexError("'ns_files' must a list of 2 'str' variables")
+        if not isinstance(ns_path, str):
+            raise ValueError("'ns_path' must be a str.")
 
         df = pd.read_table(os.path.join(ns_path, ns_files[0]))
         cls._ns['database_df'] = df.loc[df.space == 'MNI', ['id', 'x', 'y', 'z']]
@@ -233,7 +240,7 @@ class Nsaba(NsabaBase):
                 opts = " / ".join(self._aba.keys())
                 raise KeyError("'key' argument invalid; options are: %s" % opts)
 
-    def __check_entrez_struct(self, entrez_ids):
+    def _check_entrez_struct(self, entrez_ids):
         """
         Checks if 'entrez_ids' parameter is an non-str iterable; type-checking method.
         Raises errors if entrez_ids is not as specified above; ensures that methods and
@@ -264,7 +271,7 @@ class Nsaba(NsabaBase):
             list-like structure containing NIH Entrez IDs.
         """
 
-        self.__check_entrez_struct(entrez_ids)
+        self._check_entrez_struct(entrez_ids)
 
         for entrez_id in entrez_ids:
             # Fetch probe IDs for Entrez ID
@@ -365,7 +372,7 @@ class Nsaba(NsabaBase):
             Checks if an (x,y,z) MNI coordinate matches an NS data point.
         """
 
-        if len(coordinate) == 3 and ~isinstance(coordinate, str):
+        if len(coordinate) == 3 and not isinstance(coordinate, str):
             zipped_coordinates = np.squeeze(zip(self._ns['mni_coords'].data))
             for this_coordinate in zipped_coordinates:
                 if this_coordinate == coordinate:
@@ -373,7 +380,7 @@ class Nsaba(NsabaBase):
                 else:
                     return False
         else:
-            raise ValueError("Argument form improper; check function documentation.")
+            raise ValueError("MNI coordinate in improper form; must be 3-tuple-like")
 
     def coord_to_ids(self, coordinate):
         """
@@ -396,7 +403,7 @@ class Nsaba(NsabaBase):
             raise NameError("Study ID dictionary not initialized; see/call NsabaBase.ns_load_id_dict()")
 
         ids = []
-        if len(coordinate) == 3 and ~isinstance(coordinate, str):
+        if len(coordinate) == 3 and not isinstance(coordinate, str):
             for i, coords in self._ns['id_dict'].items():
                 for this_coordinate in coords:
                     if this_coordinate == coordinate:
@@ -454,19 +461,20 @@ class Nsaba(NsabaBase):
             to be estimated).
 
         """
-        self.__check_entrez_struct(entrez_ids)
 
         ge_for_coord = []
-        for entrez_id in entrez_ids:
-            coord_inds, radii = self._knn_search(coord, self._aba['mni_coords'], search_radii, k)
-            if len(coord_inds) == 0:
-                # print "No ABA coordinates are within search radius of specified coordinate"
-                break
-            weight = self.__ns_weight_f(radii)
-            local_ge = self.ge[entrez_id][coord_inds]
-            weighted_ge_mean = np.sum(local_ge*weight)/np.sum(weight)
-            ge_for_coord.append(weighted_ge_mean)
-
+        if len(coord) == 3 and not isinstance(coord, str):
+            for entrez_id in entrez_ids:
+                coord_inds, radii = self._knn_search(coord, self._aba['mni_coords'], search_radii, k)
+                if len(coord_inds) == 0:
+                    # print "No ABA coordinates are within search radius of specified coordinate"
+                    break
+                weight = self.__ns_weight_f(radii)
+                local_ge = self.ge[entrez_id][coord_inds]
+                weighted_ge_mean = np.sum(local_ge*weight)/np.sum(weight)
+                ge_for_coord.append(weighted_ge_mean)
+        else:
+            raise ValueError("MNI coordinate in improper form; must be 3-tuple-like")
         return ge_for_coord
 
     def coords_to_ge(self, coords, entrez_ids, search_radii=3, k=20):
@@ -488,10 +496,13 @@ class Nsaba(NsabaBase):
         Returns
         -------
         np.array(ge_coords): numpy.array [M x N]
-            See _coord_to_ge() documentation for more information.
+            Returns as a matrix of M coordinates by N estimated gene expression
+            coefficients. See _coord_to_ge() documentation for more information.
 
         """
-        self.__check_entrez_struct(entrez_ids)
+        self._check_entrez_struct(entrez_ids)
+        if not all([key in self.ge for key in entrez_ids]):
+            raise ValueError("One or more Entrez IDs not loaded into ge.")
 
         ge_for_coords = []
         for coord in coords:
@@ -703,7 +714,7 @@ class Nsaba(NsabaBase):
                             % method)
 
     def make_ge_ns_mat(self, ns_term, entrez_ids):
-        self.__check_entrez_struct(entrez_ids)
+        self._check_entrez_struct(entrez_ids)
 
         if ns_term in self.term and all([key in self.ge for key in entrez_ids]):
             ge_ns_mat = []
@@ -714,12 +725,12 @@ class Nsaba(NsabaBase):
             ge_ns_mat.append(self.term[ns_term]['ns_act_vector'])
             return np.vstack(ge_ns_mat).T
         else:
-            print "Either term['%s'] or one or more Entrez ID keys does not exist; please check arguments" \
-                  % ns_term
+            raise ValueError("Either term['%s'] or one or more Entrez ID keys does not exist in ge; "
+                             "please check arguments" % ns_term)
 
     def set_ns_weight_f(self, f):
         try:
             print "Test: f(e) = %.2f" % f(np.e)
             self.__ns_weight_f = f
         except TypeError:
-            print "'f' is improper, ensure 'f' receives only one parameter and returns a numeric type"
+            raise ValueError("'f' is improper, ensure 'f' receives only one parameter and returns a numeric type")
