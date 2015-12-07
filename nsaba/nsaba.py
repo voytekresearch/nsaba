@@ -479,13 +479,13 @@ class Nsaba(NsabaBase):
 
     def coords_to_ge(self, coords, entrez_ids, search_radii=3, k=20):
         """
-        Returns Returns weighted ABA gene expression statistic for a list MNI coordinate based
-        on a list of passed Entrez IDs
+        Returns weighted ABA gene expression statistic for a list MNI coordinate based
+        on a list of passed Entrez IDs.
 
         Parameters
         ----------
         coords: list-like
-            List of reference MNI coordinate for gene expression to be estimated at.
+            List of reference MNI coordinates for gene expression to be estimated at.
         entrez_ids: list-like
             Entrez IDs for gene expressions to be estimated around 'coord'.
         search_radii: numeric
@@ -513,18 +513,28 @@ class Nsaba(NsabaBase):
         return np.array(ge_for_coords)
 
     def coord_to_terms(self, coord):
+        """
+        Returns list of terms activations for a coordinate
+
+        Parameters
+        ----------
+        coord: tuple-like (3)
+            Reference MNI coordinate.
+
+        Returns
+        -------
+        terms: list
+            Terms activations about coord.
+        """
         ids = self.coord_to_ids(coord)
         if len(ids) == 1:
-            # one study
             terms = self._id_to_terms(ids)
         elif len(ids) > 1:
-            # multiple studies
             temp = []
             for multiple_id in ids:
                 temp.append(self._id_to_terms(multiple_id))
                 terms = np.mean(temp, 0)
         else:
-            # print 'No terms found for id' + str(ids) + 'using coordinates:' + str(coord)
             terms = []
         return terms
 
