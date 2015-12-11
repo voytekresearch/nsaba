@@ -3,7 +3,7 @@
 Methods to analyze genome-scale gene expression data from the Allen Human Brain Atlas in conjunction with fMRI activation maps from Neurosynth
 
 
-##Setup Instructions
+## Local Setup Instructions
 
 - Download the H0351.2001 file from http://human.brain-map.org/static/download and save the file in a place that you will remember (/Users/User/Documents/Nsaba_analysis/).
 This file is genome-scale gene expression at ~900 sites on one human brain. Multi-brain analyses coming soon.
@@ -14,7 +14,7 @@ Save the decompressed output of this file to somewhere you will remember (/Users
 
 ## Example Usage:
 
-    from nsaba import Nsaba
+    from nsaba.nsaba import Nsaba
 
     aba_path = '/Users/User/Documents/Nsaba_analysis/normalized_microarray_donor9861/' #path to ABA data
     ns_path = '/Users/User/Documents/Nsaba_analysis/current_data/' #path to NS data
@@ -22,15 +22,26 @@ Save the decompressed output of this file to somewhere you will remember (/Users
     Nsaba.aba_load(aba_path)
     Nsaba.ns_load(ns_path)
 
-    entrez_ids = [740, 88]
-	my_term = 'alzheimer'
-    alz = Nsaba()
+    entrez_ids = [1813, 1816]
+	my_term = 'attention'
+    att = Nsaba()
     
-    alz.get_aba_ge(entrez_ids)
-    alz.get_ns_act(my_term, thresh=0, method='knn', k=15)
-    analysis_matrix = alz.make_ge_ns_mat(my_term, entrez_ids)
+    att.get_aba_ge(entrez_ids)
+    att.get_ns_act(my_term, thresh=0, method='knn', k=15)
+    analysis_matrix = att.make_ge_ns_mat(my_term, entrez_ids)
     
     # Run Science
+    
+Or use nsaba's builtin analysis module for plug-n-play statistics.
+
+    import nsaba.analyis as na
+     
+    ....
+    
+    gene = 1813
+    
+    att_stats  = na.NsabaAnalysis(att)
+    att_stat.t_test('attention', gene)
     
 ## Science Sloth!    
 ![Science Sloth!](http://gifts.worldwildlife.org/gift-center/Images/large-species-photo/large-Three-toed-Sloth-photo.jpg 

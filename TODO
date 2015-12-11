@@ -1,3 +1,2 @@
  -- Optimize get_act_values()
- -- Validation module
- -- Sequential hdf5 activation storage
+ -- Document analysis.py, nsaba.py, visualizer.py, builder.py
