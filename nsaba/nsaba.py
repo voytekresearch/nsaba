@@ -407,9 +407,9 @@ class Nsaba(NsabaBase):
             Reference MNI coordinate.
         entrez_ids: list-like
             Entrez IDs for gene expressions to be estimated around 'coord'.
-        search_radii: numeric
+        search_radii: numeric, optional
             Max search radii for KNN gene expression estimation technique.
-        k: int
+        k: int, optional
             k parameter for KNN estimation.
 
         Returns
@@ -447,9 +447,9 @@ class Nsaba(NsabaBase):
             List of reference MNI coordinates for gene expression to be estimated at.
         entrez_ids: list-like
             Entrez IDs for gene expressions to be estimated around 'coord'.
-        search_radii: numeric
+        search_radii: numeric, optional
             Max search radii for KNN gene expression estimation technique.
-        k: int
+        k: int, optional
             k parameter for KNN estimation.
 
         Returns
@@ -533,7 +533,7 @@ class Nsaba(NsabaBase):
             List of reference MNI coordinates for term activation
         entrez_ids: list-like
             Entrez IDs for gene expressions to be estimated around 'coord'.
-        search_radii: numeric
+        search_radii: numeric, optional
             Max search radii for KNN gene expression estimation technique.
 
         Returns
@@ -578,7 +578,7 @@ class Nsaba(NsabaBase):
         term : string
             NS term of interest
 
-        no_ids : numeric
+        no_ids : numeric, optional
             Number of studies to return coordinates for.
 
         Returns
