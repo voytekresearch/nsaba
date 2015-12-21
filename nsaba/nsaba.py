@@ -10,6 +10,7 @@ Authors: Simon Haxby & Torben Noto
 import pickle
 import os
 import itertools
+import collections
 import numpy as np
 import pandas as pd
 from scipy import spatial
@@ -141,6 +142,7 @@ class NsabaBase(object):
     @preprint('This may take a minute or two ...')
     def ns_load_id_dict(cls):
         """ID dictionary thing needed for doing some NS analyses"""
+        cls._check_static_members()
         cls._ns['id_dict'] = {}
         c = 0
         for i in cls._ns['database_df'].loc[:, 'id']:
@@ -155,6 +157,7 @@ class NsabaBase(object):
                                              np.floor(cls._ns['database_df']['z'].iloc[c])))
                 c += 1
 
+    @classmethod
     def _check_static_members(self):
         """ Ensures Nsaba class is not instantiated without initalizing NsabaBase.aba and NsabaBase.ns."""
         for val in self._aba.itervalues():
@@ -167,27 +170,8 @@ class NsabaBase(object):
 
 class Nsaba(NsabaBase):
     """
-    Main Nsaba class. Contains methods data fetching, estimation and organization.
-
-    Methods
-    -------
-    get_ns_struct
-    get_aba_struct
-    get_aba_ge()
-    pickle_ge()
-    load_ge_pickle()
-    is_gene()
-    is_term()
-    is_id()
-    coords_to_ge
-    coords_to_ids()
-    coord_to_terms()
-    coords_to_terms()
-    term_to_coords()
-    get_ns_act()
-    make_ge_ns_mat()
-    set_ns_weight_f()
-
+    Principal Nsaba class.
+    Contains methods for data fetching and estimation.
     """
 
     def __init__(self):
@@ -196,7 +180,7 @@ class Nsaba(NsabaBase):
         self._check_static_members()
         self.ge = {}
         self.term = {}
-        self.__ns_weight_f = lambda r: 1. / r ** 2
+        self._ns_weight_f = lambda r: 1. / r ** 2
 
     def get_ns_struct(self, key=None):
         """
@@ -364,7 +348,7 @@ class Nsaba(NsabaBase):
         else:
             return False
 
-    def is_coord(self, coordinate):
+    def is_coord(self, coord):
         """
         Parameters
         ----------
@@ -372,17 +356,15 @@ class Nsaba(NsabaBase):
             Checks if an (x,y,z) MNI coordinate matches an NS data point.
         """
 
-        if len(coordinate) == 3 and not isinstance(coordinate, str):
-            zipped_coordinates = np.squeeze(zip(self._ns['mni_coords'].data))
-            for this_coordinate in zipped_coordinates:
-                if this_coordinate == coordinate:
-                    return True
-                else:
-                    return False
+        if len(coord) == 3 and not isinstance(coord, str):
+            if self._ns['mni_coords'].query(coord, distance_upper_bound=1)[0] == 0:
+                return True
+            else:
+                return False
         else:
             raise ValueError("MNI coordinate in improper form; must be 3-tuple-like")
 
-    def coord_to_ids(self, coordinate):
+    def coord_to_ids(self, coord):
         """
         Uses the study dictionary above to find NS study ids from x,y,z coordinates.
 
@@ -394,7 +376,7 @@ class Nsaba(NsabaBase):
         Returns
         -------
         ids: list (int)
-            NS study IDs that have a data point corresponding to 'coordinate'.
+            NS study IDs that have a data point corresponding to coord.
         """
 
         try:
@@ -403,39 +385,16 @@ class Nsaba(NsabaBase):
             raise NameError("Study ID dictionary not initialized; see/call NsabaBase.ns_load_id_dict()")
 
         ids = []
-        if len(coordinate) == 3 and not isinstance(coordinate, str):
+        if len(coord) == 3 and not isinstance(coord, str):
             for i, coords in self._ns['id_dict'].items():
                 for this_coordinate in coords:
-                    if this_coordinate == coordinate:
+                    if this_coordinate == coord:
                         if i not in ids:
                             if self.is_id(i):
                                 ids.append(i)
             return ids
         else:
             raise ValueError("Argument form improper; check function documentation.")
-
-    def _id_to_terms(self, study_id):
-        """
-        Returns activations for all terms for a given study.
-
-        Parameters
-        ----------
-        study_id: int
-            int representing a paper/study in the NS framework.
-
-        Return
-        ------
-        term_vector_off_by_1[1:]: numpy.array [1 x 3406]
-            Vector of term activations for all terms for a specified NS study.
-        """
-
-        if self.is_id(study_id):
-            term_vector_off_by_1 = np.squeeze(self._ns['features_df'].loc[self._ns['features_df']['pmid']
-                                                                          == study_id].as_matrix())
-            # shifting to remove ID index from vector
-            return term_vector_off_by_1[1:]
-        else:
-            raise ValueError("Invalid NS study ID; check 'study_id' parameter")
 
     def _coord_to_ge(self, coord, entrez_ids, search_radii=3, k=20):
         """
@@ -469,7 +428,7 @@ class Nsaba(NsabaBase):
                 if len(coord_inds) == 0:
                     # print "No ABA coordinates are within search radius of specified coordinate"
                     break
-                weight = self.__ns_weight_f(radii)
+                weight = self._ns_weight_f(radii)
                 local_ge = self.ge[entrez_id][coord_inds]
                 weighted_ge_mean = np.sum(local_ge*weight)/np.sum(weight)
                 ge_for_coord.append(weighted_ge_mean)
@@ -512,9 +471,33 @@ class Nsaba(NsabaBase):
 
         return np.array(ge_for_coords)
 
-    def coord_to_terms(self, coord):
+    def _id_to_ns_act(self, study_id):
         """
-        Returns list of terms activations for a coordinate
+        Returns activations for all terms for a given study.
+
+        Parameters
+        ----------
+        study_id: int
+            int representing a paper/study in the NS framework.
+
+        Return
+        ------
+        term_vector_off_by_1[1:]: numpy.array [1 x 3406]
+            Vector of term activations for all terms for a specified NS study.
+        """
+
+        if self.is_id(study_id):
+            term_vector_off_by_1 = np.squeeze(self._ns['features_df'].loc[self._ns['features_df']['pmid']
+                                                                          == study_id].as_matrix())
+            # Shifting to remove ID index from vector
+            return term_vector_off_by_1[1:]
+        else:
+            raise ValueError("Invalid NS study ID; check 'study_id' parameter")
+
+    def coord_to_ns_act(self, coord):
+        """
+        Returns list of terms activations for a MNI coordinate
+        for all NS terms.
 
         Parameters
         ----------
@@ -524,22 +507,41 @@ class Nsaba(NsabaBase):
         Returns
         -------
         terms: list
-            Terms activations about coord.
+            Terms activations about coord. If no activation data
+            is at coord then an empty list is returned.
         """
         ids = self.coord_to_ids(coord)
         if len(ids) == 1:
-            terms = self._id_to_terms(ids)
+            terms = self._id_to_ns_act(ids)
         elif len(ids) > 1:
             temp = []
             for multiple_id in ids:
-                temp.append(self._id_to_terms(multiple_id))
+                temp.append(self._id_to_ns_act(multiple_id))
                 terms = np.mean(temp, 0)
         else:
             terms = []
         return terms
 
-    def coords_to_term(self, coords, term, search_radii=5):
-        # only uses knn
+    def coords_to_ns_act(self, coords, term, search_radii=5):
+        """
+        Returns a list NS activations at specified coordinates
+        for a given term.
+
+        Parameters
+        ----------
+        coords: list-like
+            List of reference MNI coordinates for term activation
+        entrez_ids: list-like
+            Entrez IDs for gene expressions to be estimated around 'coord'.
+        search_radii: numeric
+            Max search radii for KNN gene expression estimation technique.
+
+        Returns
+        -------
+        terms: list
+            Terms activations about coords for a given term.
+
+        """
         if self.is_term(term):
             try:
                 self._ns['id_dict']
@@ -549,26 +551,44 @@ class Nsaba(NsabaBase):
             term_vector = np.zeros((1, len(coords)))
             c = 0
             for coord in coords:
-                temp_term = self.coord_to_terms(coord)
+                temp_term = self.coord_to_ns_act(coord)
                 if len(temp_term) > 0:
                     term_vector[0, c] = temp_term[term_index]
                     c += 1
                 else:
                     r, inds = self._ns['mni_coords'].query(coord, search_radii)
                     temp_coords = self._ns['mni_coords'].data[inds]
-                    weight = 1./r**2
                     term_acts = []
 
                     for temp_coord in temp_coords:
-                        term_act = self.coord_to_terms(np.floor(temp_coord))[term_index]
+                        term_act = self.coord_to_ns_act(np.floor(temp_coord))[term_index]
                         if term_act > 0:
-                            term_acts.append(sum(np.squeeze(term_acts * weight)))
+                            term_acts.append(sum(np.squeeze(term_acts * self._ns_weight_f(r))))
             return term_vector
         else:
             raise TypeError("'%s' is not a valid term." % term)
 
-    # front-facing method to find MNI coordinates with high term associations
     def term_to_coords(self, term, no_ids=3):
+        """
+        Returns coordinates associated with studies that have the
+        greatest term activation.
+
+        Parameters
+        ----------
+        term : string
+            NS term of interest
+
+        no_ids : numeric
+            Number of studies to return coordinates for.
+
+        Returns
+        -------
+        coords : list [ PMID_coord_pair (int, list [tuple(1x3)] ) ]
+            Returns a list of len(no_ids) lists containing a namedtuple:
+            "PMID_coord_pair". PMID_coord_pair contains two arguments: PMID
+            and a list of coordinates (in tuple form) for that study.
+        """
+        id_coord_pair = collections.namedtuple("PMID_coord_pair", "pmid coords")
         if term in self.term:
             try:
                 self._ns['id_dict'][24379394]
@@ -581,12 +601,28 @@ class Nsaba(NsabaBase):
             coords = []
             for pmid in pmids:
                 if self.is_id(pmid):
-                    coords.append(self._ns['id_dict'][pmid])
-            return np.squeeze(coords)
+                    coords.append(id_coord_pair(pmid, self._ns['id_dict'][pmid]))
+            return coords
 
     def _term_to_coords(self, term, thresh=0):
-        """Finds coordinates associated with a given term.
-        Returns NS coordinate tree and ID/coordinate/activation DataFrame"""
+        """
+        Finds coordinates associated with a given term above
+        a specified threshold.
+
+        Parameters
+        ----------
+        term : string
+            NS term of interest
+
+        thresh : numeric
+            NS activation threshold.
+            (activations < threshold: are discarded)
+
+        Returns
+        -------
+        (spatial.KDTree, pandas.DataFrame)
+
+        """
         term_ids_act = self._ns['features_df'].loc[self._ns['features_df'][term] > thresh, ['pmid', term]]
         term_ids = term_ids_act['pmid'].tolist()
         term_coords = self._ns['database_df'].loc[self._ns['database_df']['id'].isin(term_ids)]
@@ -665,7 +701,7 @@ class Nsaba(NsabaBase):
                     self.term[term]['ns_act_vector'].append(act_coeff)
 
             else:
-                weight = self.__ns_weight_f(radii)
+                weight = self._ns_weight_f(radii)
                 weighted_means = self._get_act_values(coords, weight, term, ns_coord_act_df)
                 if len(weighted_means) == 0:
                     self.term[term]['aba_void_indices'].append(irow)
@@ -684,7 +720,7 @@ class Nsaba(NsabaBase):
                     gaussian_window = gaussian(len(w)*2+1, std=2)  # std 2 is arbitrary but looks nice
                     weight = [gaussian_window[r+len(w)-1] for r in w]
                 else:
-                    weight = self.__ns_weight_f(w + 1)
+                    weight = self._ns_weight_f(w + 1)
                 bucket_mean = np.mean(self._get_act_values(bucket, weight, term, ns_coord_act_df))
                 if np.isnan(bucket_mean):
                     sphere_vals[0] += 0
@@ -741,6 +777,6 @@ class Nsaba(NsabaBase):
     def set_ns_weight_f(self, f):
         try:
             print "Test: f(e) = %.2f" % f(np.e)
-            self.__ns_weight_f = f
+            self._ns_weight_f = f
         except TypeError:
             raise ValueError("'f' is improper, ensure 'f' receives only one parameter and returns a numeric type")

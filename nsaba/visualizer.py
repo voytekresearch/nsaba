@@ -86,9 +86,9 @@ class NsabaVisualizer(object):
             weights = []
             inds_of_real_points_with_no_fucking_missing_study_ids = []
             for rand_point in range(len(rand_points)):
-                if len(self.no.coord_to_terms(rand_points[rand_point].astype(list))) > 0:
+                if len(self.no.coord_to_ns_act(rand_points[rand_point].astype(list))) > 0:
                     inds_of_real_points_with_no_fucking_missing_study_ids.append(rand_point_inds[rand_point])
-                    weights.append(self.no.coord_to_terms(rand_points[rand_point].astype(list))[term_index])
+                    weights.append(self.no.coord_to_ns_act(rand_points[rand_point].astype(list))[term_index])
             fig = plt.figure()
             ax = fig.add_subplot(111, projection='3d')
             colors = cm.jet(weights/max(weights))

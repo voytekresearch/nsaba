@@ -5,8 +5,8 @@ Author: Simon Haxby
 """
 
 from nsaba import Nsaba
-from nsaba import get_gene_info, load_gene_file
 from nsabatools import preprint, not_operational
+from geneinfo import load_gene_file, get_gene_info
 
 import random
 import collections
@@ -156,8 +156,8 @@ class NsabaAnalysis(object):
         """ T-Test of gene expression between term and non-term coordinates"""
         if not quant:
             quant = 85
-        term1 = self.no.coords_to_term(coords1, term)
-        term2 = self.no.coords_to_term(coords2, term)
+        term1 = self.no.coords_to_ns_act(coords1, term)
+        term2 = self.no.coords_to_ns_act(coords2, term)
 
         if log:
             term1 = np.log(term1)
