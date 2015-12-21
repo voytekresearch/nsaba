@@ -45,7 +45,6 @@ retrieval.
      
     ....
     
-    
     att_stats  = na.NsabaAnalysis(att)
     tttest_metrics = att_stats.t_test_multi('reward',quant=90)
     att_stats.fetch_gene_descriptions(tttest_metrics)
