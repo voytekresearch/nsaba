@@ -58,4 +58,6 @@ See for this [notebook](https://github.com/voytekresearch/nsaba/blob/master/note
  hosted [binder](http://mybinder.org/).
  
  * Multi-brain analysis.
+ 
+ * Full suite of demonstration and example notebooks.
 
