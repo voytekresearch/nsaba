@@ -6,19 +6,25 @@ Author: Simon Haxby
 
 from nsaba import Nsaba
 from nsabatools import preprint, not_operational
+<<<<<<< HEAD
 from geneinfo import load_gene_file, get_gene_info
 
 import random
 import collections
 import csv
 
+=======
+import random
+import collections
+from scipy import stats
+>>>>>>> f5e917ca8716185fddaa6d6197779d53278fb897
 import numpy as np
-import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from scipy import stats
 from sklearn.cluster import KMeans
 from sklearn import mixture
+import csv
+import pandas as pd
 
 
 def cohen_d(x1, x2, n1, n2):
@@ -194,7 +200,7 @@ class NsabaAnalysis(object):
             raise ValueError("graphops parameter '%s' not recognized" % graphops)
 
     @preprint('This may take a couple of minutes ...')
-    def t_test_multi(self, gi_csv_path, nih_only, term, quant=None, sample_num=None, split_method='var',
+    def t_test_multi(self, term, quant=None, sample_num=None, split_method='var',
                      genes_of_interest=None, **kwargs):
         if term not in self.no.term:
             raise ValueError("Term activation not generated for '%s" % term)
@@ -217,8 +223,9 @@ class NsabaAnalysis(object):
                     df = load_gene_file(gi_path)
                 else:
                     df = load_gene_file()
-                nih_ids = df['entrez'].as_matrix()
-                sam_ids = [entrez_id for entrez_id in nih_ids if entrez_id in nih_ids]
+                sam_ids = df['Entrez'].as_matrix()
+                # does nothing nih_ids = df['Entrez'].as_matrix()
+                # sam_ids = [entrez_id for entrez_id in nih_ids if entrez_id in nih_ids]
                 print "Using NIH described genes only; Entrez ID sample size now %d" % (len(sam_ids))
 
         ge_mat = self.no.make_ge_ns_mat(term, sam_ids).T[:-1]
@@ -234,12 +241,15 @@ class NsabaAnalysis(object):
             test_stats = stats.ttest_ind(cont_grp, funct_grp)
             d = cohen_d(cont_grp, funct_grp, len(cont_grp), len(funct_grp))
             # One-sided T-Test
-            if test_stats[0] <= 0:
-                gene_stats.append(self.gene_rec(eid, d, test_stats[1]))
+            if 'full' in kwargs:
+                gene_stats.append(self.gene_rec(int(eid), d, test_stats[1]))
             else:
-                continue
+                if test_stats[0] <= 0:
+                    gene_stats.append(self.gene_rec(int(eid), d, test_stats[1]))
+                else:
+                    continue
             if eid in genes_of_interest:
-                print 'Gene: ' + str(eid) + '  Effect Size: '+str(d)
+                print 'Gene: ' + str(int(eid)) + '  Effect Size: '+str(d)
         # Sort effect sizes from greatest to smallest in magnitude
         gene_stats.sort(key=lambda rec: rec.cohen_d)
         ttest_metrics['results'] = gene_stats
@@ -312,58 +322,160 @@ class NsabaAnalysis(object):
             for i in top_genes:
                 writer.writerow([i[0], i[3], i[1], i[2], i[4]])
 
-    def validate(self, term, genes, alt_genes=None, method='t_test', quant=85):
-        real_gene_output = []
-        random_gene_output = []
+    def term_to_genes(self, term, method='spearman', **kwargs):
+        if term not in self.no.term:
+            raise ValueError("Term activation not generated for '%s" % term)
+        if 'nih_only' in kwargs:
+            if kwargs['nih_only']:
+                if 'gi_csv_path' in kwargs:
+                    gi_path = kwargs['gi_csv_path']
+                    df = load_gene_file(gi_path)
+                else:
+                    df = load_gene_file()
+                nih_ids = df['Entrez'].as_matrix()
+                nih_genes = [entrez_id for entrez_id in nih_ids if entrez_id in nih_ids]
+                print "Using NIH described genes only; Entrez ID sample size now %d" % (len(nih_genes))
 
-        if method == 't_test':
-            ttest_metrics = self.t_test_multi(term, quant=quant)
-            if alt_genes == None:
-                alt_genes = random.randint(1, len(ttest_metrics['results']), len(genes))
-            for i in ttest_metrics['results']:
-                if int(i[0]) in genes:
-                    real_gene_output.append(i[1])
-                if int(i[0]) in alt_genes:
-                    random_gene_output.append(i[1])
-            #return stats.ttest_ind(real_gene_output, random_gene_output)[1]  # p value
-            return real_gene_output, random_gene_output
-
-        if method == 'pearson':
-            alt_indices = random.randint(1, len(self.no.aba['probe_df']['entrez_id']), len(genes))
-            alt_genes = self.no.aba['probe_df']['entrez_id'][alt_indices]
-            for gene in genes:
-                ge_ns_mat = self.no.make_ge_ns_mat(term, gene)
-                real_gene_output.append(np.corrcoef(ge_ns_mat[:, 0], np.log(ge_ns_mat[:, 1])))
-            for gene in alt_genes:
-                ge_ns_mat = self.no.make_ge_ns_mat(term, gene)
-                real_gene_output.append(np.corrcoef(ge_ns_mat[:, 0], np.log(ge_ns_mat[:, 1])))
-            return real_gene_output, random_gene_output
+            ge_mat = self.no.make_ge_ns_mat(term, nih_genes)
+        else:
+            ge_mat = self.no.make_ge_ns_mat(term, self.no.aba.keys())
 
         if method == 'spearman':
-            alt_indices = random.randint(1, len(self.no.aba['probe_df']['entrez_id']), len(genes))
-            alt_genes = self.no.aba['probe_df']['entrez_id'][alt_indices]
+            if nih_genes:
+                r_vals = [stats.spearmanr(ge_mat[:, ge_mat.shape[1]-1], ge_mat[:, r])[0] for r in xrange(len(nih_genes))]
+            else:
+                r_vals = [stats.spearmanr(ge_mat[:, ge_mat.shape[1]-1], ge_mat[:, r])[0] for r in xrange(len(self.no.ge.keys()))]
+            return r_vals
+        if method == 'pearson':
+            if nih_genes:
+                r_vals = [np.corrcoef(ge_mat[:, ge_mat.shape[1]-1], ge_mat[:, r])[1, 0] for r in xrange(len(nih_genes))]
+            else:
+                r_vals = [np.corrcoef(ge_mat[:, ge_mat.shape[1]-1], ge_mat[:, r])[1, 0] for r in xrange(len(self.no.ge.keys()))]
+            return r_vals
+        if method == 'regression':
+            m_vals = []
+            if nih_genes:
+                for gene in xrange(len(nih_genes)):
+                    X = np.vstack([ge_mat[:, ge_mat.shape[1]-1], np.ones(len(ge_mat[:, 0]))]).T
+                    m, c = np.linalg.lstsq(X, ge_mat[:, gene])[0]
+                    m_vals.append(m)
+            else:
+                for gene in xrange(len(self.no.ge.keys())):
+                    X = np.vstack([ge_mat[:, ge_mat.shape[1]-1], np.ones(len(ge_mat[:, 0]))]).T
+                    m, c = np.linalg.lstsq(X, ge_mat[:, gene])[0]
+                    m_vals.append(m)
+            return m_vals
+
+    def validate_with_t_test(self, term, genes, method='t_test', quant=None, split_method='var',
+                             non_zero=False, gi_csv_path= '/Users/Torben/Code/nsaba/'):
+        stat_output = []
+
+        if method == 't_test':
+            ttest_metrics = self.t_test_multi(term, quant=quant,
+                                              split_method=split_method,
+                                              full=True, nih_only=True,
+                                              gi_csv_path=gi_csv_path)
+            for i in ttest_metrics['results']:
+                if int(i[0]) in genes:
+                    stat_output.append(i[1])
+            return stat_output
+
+        if method == 'pearson':
             for gene in genes:
-                ge_ns_mat = self.no.make_ge_ns_mat(term, gene)
-                real_gene_output.append(stats.spearmanr(ge_ns_mat[:, 0], ge_ns_mat[:, 1]))
-            for gene in alt_genes:
-                ge_ns_mat = self.no.make_ge_ns_mat(term, gene)
-                real_gene_output.append(stats.spearmanr(ge_ns_mat[:, 0], ge_ns_mat[:, 1]))
-            return real_gene_output, random_gene_output
+                ge_mat = self.no.make_ge_ns_mat(term, [gene])
+                if non_zero:
+                    min_val = np.min(ge_mat[:, ge_mat.shape[1]][np.nonzero(ge_mat[:, ge_mat.shape[1]])]) # min nonzero value
+                    term_axis = ge_mat[:, ge_mat.shape[1]][ge_mat[:, ge_mat.shape[1]] > min_val]
+                    ge_axis = ge_mat[:, 0][ge_mat[:, ge_mat[:, ge_mat.shape[1]]] > min_val]
+                else:
+                    term_axis = ge_mat[:, ge_mat.shape[1]]
+                    ge_axis = ge_mat[:, 0]
+                stat_output.append(np.corrcoef(ge_axis, term_axis)[1, 0])
+
+            return stat_output
+
+        if method == 'spearman':
+            for gene in genes:
+                ge_ns_mat = self.no.make_ge_ns_mat(term, [gene])
+                if non_zero:
+                    min_val = np.min(ge_mat[:, ge_mat.shape[1]][np.nonzero(ge_mat[:, ge_mat.shape[1]])]) # min nonzero value
+                    term_axis = ge_mat[:, ge_mat.shape[1]][ge_mat[:, ge_mat.shape[1]] > min_val]
+                    ge_axis = ge_mat[:, 0][ge_mat[:, ge_mat[:, ge_mat.shape[1]]] > min_val]
+                else:
+                    term_axis = ge_mat[:, ge_mat.shape[1]]
+                    ge_axis = ge_mat[:, 0]
+                stat_output.append(stats.spearmanr(ge_axis, term_axis)[0])
+            return stat_output
 
         if method == 'regression':
-            alt_indices = random.randint(1, len(self.no.aba['probe_df']['entrez_id']), len(genes))
-            alt_genes = self.no.aba['probe_df']['entrez_id'][alt_indices]
             for gene in genes:
                 ge_ns_mat = self.no.make_ge_ns_mat(term, gene)
+                if non_zero:
+                    min_val = np.min(ge_mat[:, ge_mat.shape[1]][np.nonzero(ge_mat[:, ge_mat.shape[1]])]) # min nonzero value
+                    term_axis = ge_mat[:, ge_mat.shape[1]][ge_mat[:, ge_mat.shape[1]] > min_val]
+                    ge_axis = ge_mat[:, 0][ge_mat[:, ge_mat[:, ge_mat.shape[1]]] > min_val]
+                else:
+                    term_axis = ge_mat[:, ge_mat.shape[1]]
+                    ge_axis = ge_mat[:, 0]
+                X = np.vstack([ge_axis, np.ones(len(ge_axis))]).T
+                m, c = np.linalg.lstsq(X, term_axis)[0]
+                stat_output.append(m)
+            return stat_output
+
+
+    def validate_by_alpha(self, term, genes, method='t_test', quant=85, alpha=0.05, nih_only=False, gi_csv_path='.'):
+        genes_found = []
+        if method == 't_test':
+            ttest_metrics = self.t_test_multi(term, quant=quant, nih_only=nih_only, gi_csv_path=gi_csv_path)
+            alpha_studies = int(alpha * len(ttest_metrics['results']))
+
+            sorted_studies = sorted(ttest_metrics['results'], key=lambda x: x.cohen_d)[:alpha_studies]
+
+            for i in sorted_studies:
+                for gene in genes:
+                    if int(gene) == int(i.entrez):
+                        genes_found.append(gene)
+            return genes_found
+
+        if method == 'pearson':
+            r_vals = self.term_to_genes(term=term, method='pearson', nih_only=nih_only, gi_csv_path=gi_csv_path)
+            alpha_study_threshold = int(alpha * len(r_vals))
+            alpha_index = [i for i in reversed(sorted(r_vals))][alpha_study_threshold]
+            print "pearson's r must be > " + str(alpha_index)
+            for gene in genes:
+                ge_ns_mat = self.no.make_ge_ns_mat(term, [gene])
+                r_val = np.corrcoef(ge_ns_mat[:, 0], ge_ns_mat[:, 1])[1, 0]
+                if r_val > alpha_index:
+                    genes_found.append(gene)
+            return genes_found
+
+        if method == 'spearman':
+            r_vals = self.term_to_genes(term=term, method='spearman', nih_only=nih_only, gi_csv_path=gi_csv_path)
+            alpha_study_threshold = int(alpha * len(r_vals))
+            alpha_index = [i for i in reversed(sorted(r_vals))][alpha_study_threshold]
+            print "spearman's r must be > " + str(alpha_index)
+            for gene in genes:
+                ge_ns_mat = self.no.make_ge_ns_mat(term, [gene])
+                r_val = stats.spearmanr(ge_ns_mat[:, 0], ge_ns_mat[:, 1])[0]
+                if r_val > alpha_index:
+                    genes_found.append(gene)
+            return genes_found
+
+        if method == 'regression':
+            m_vals = self.term_to_genes(term=term, method='regression',nih_only=nih_only, gi_csv_path=gi_csv_path)
+            alpha_study_threshold = int(alpha * len(m_vals))
+            alpha_index = [i for i in reversed(sorted(m_vals))][alpha_study_threshold]
+            print "slope of linear regression must be > " + str(alpha_index)
+            for gene in genes:
+                ge_ns_mat = self.no.make_ge_ns_mat(term, [gene])
                 X = np.vstack([ge_ns_mat[:, 0], np.ones(len(ge_ns_mat[:, 0]))]).T
-                m, c = np.linalg.lstsq(X, np.log(ge_ns_mat[:, 1]))[0]
-                real_gene_output.append(m, c)
-            for gene in alt_genes:
-                ge_ns_mat = self.no.make_ge_ns_mat(term, gene)
-                X = np.vstack([ge_ns_mat[:, 0], np.ones(len(ge_ns_mat[:, 0]))]).T
-                m, c = np.linalg.lstsq(X, np.log(ge_ns_mat[:, 1]))[0]
-                random_gene_output.append(m, c)
-            return real_gene_output, random_gene_output
+                m, c = np.linalg.lstsq(X, ge_ns_mat[:, 1])[0]
+                if m > alpha_index:
+                    genes_found.append(gene)
+            return genes_found
+        else:
+            print 'Invalid analysis method. Use pearson, spearman, regression, or t_test'
+            return []
 
 
 def load_gene_list(path, filename):
