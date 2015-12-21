@@ -32,7 +32,7 @@ Save the decompressed output of this file to somewhere you will remember (/Users
     
     # Run Science
     
-Or use nsaba's builtin analysis module for plug-n-play statistics.
+Or use nsaba's builtin analysis module
 
     import nsaba.analyis as na
      
@@ -43,8 +43,8 @@ Or use nsaba's builtin analysis module for plug-n-play statistics.
     att_stats  = na.NsabaAnalysis(att)
     att_stat.t_test('attention', gene)
     
-## Science Sloth!    
-![Science Sloth!](http://gifts.worldwildlife.org/gift-center/Images/large-species-photo/large-Three-toed-Sloth-photo.jpg 
-    "Science Sloth preparing to do Science!")
+## Futures
+
+A [pip](https://pypi.python.org/pypi/pip) package is currently underdevelopment as well as a hosted [binder](http://mybinder.org/).
 
 
