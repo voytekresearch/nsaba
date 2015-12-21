@@ -1,23 +1,16 @@
 """
 analysis.py:
 Statistical testing and analysis tools for Nsaba.
-Author: Simon Haxby
+Author: Simon Haxby & Torben Noto
 """
 
 from nsaba import Nsaba
 from nsabatools import preprint, not_operational
-<<<<<<< HEAD
 from geneinfo import load_gene_file, get_gene_info
 
 import random
 import collections
-import csv
-
-=======
-import random
-import collections
 from scipy import stats
->>>>>>> f5e917ca8716185fddaa6d6197779d53278fb897
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -396,7 +389,7 @@ class NsabaAnalysis(object):
 
         if method == 'spearman':
             for gene in genes:
-                ge_ns_mat = self.no.make_ge_ns_mat(term, [gene])
+                ge_mat = self.no.make_ge_ns_mat(term, [gene])
                 if non_zero:
                     min_val = np.min(ge_mat[:, ge_mat.shape[1]][np.nonzero(ge_mat[:, ge_mat.shape[1]])]) # min nonzero value
                     term_axis = ge_mat[:, ge_mat.shape[1]][ge_mat[:, ge_mat.shape[1]] > min_val]
@@ -409,7 +402,7 @@ class NsabaAnalysis(object):
 
         if method == 'regression':
             for gene in genes:
-                ge_ns_mat = self.no.make_ge_ns_mat(term, gene)
+                ge_mat = self.no.make_ge_ns_mat(term, gene)
                 if non_zero:
                     min_val = np.min(ge_mat[:, ge_mat.shape[1]][np.nonzero(ge_mat[:, ge_mat.shape[1]])]) # min nonzero value
                     term_axis = ge_mat[:, ge_mat.shape[1]][ge_mat[:, ge_mat.shape[1]] > min_val]
