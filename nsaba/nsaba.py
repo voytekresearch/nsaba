@@ -587,6 +587,7 @@ class Nsaba(NsabaBase):
             Returns a list of len(no_ids) lists containing a namedtuple:
             "PMID_coord_pair". PMID_coord_pair contains two arguments: PMID
             and a list of coordinates (in tuple form) for that study.
+
         """
         id_coord_pair = collections.namedtuple("PMID_coord_pair", "pmid coords")
         if term in self.term:
