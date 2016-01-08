@@ -10,7 +10,7 @@ import pandas as pd
 import os
 import random
 import urllib2
-from BeautifulSoup import BeautifulSoup
+from bs4 import BeautifulSoup
 from time import sleep
 from collections import namedtuple
 
