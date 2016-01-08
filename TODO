@@ -1,5 +1,6 @@
  -- Optimize get_act_values()
  -- Document analysis.py, nsaba.py, visualizer.py
+ -- Gene ratio upper echelon matrix.
 
 
 nsaba.py
