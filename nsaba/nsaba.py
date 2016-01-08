@@ -690,7 +690,6 @@ class Nsaba(NsabaBase):
                 estimated_activation = self._get_act_values(coords, weight, term, ns_coord_act_df, method=estimation_method)
 
             else:
-<<<<<<< HEAD
                 weight = self._ns_weight_f(radii)
                 weighted_means = self._get_act_values(coords, weight, term, ns_coord_act_df)
                 if len(weighted_means) == 0:
@@ -698,7 +697,6 @@ class Nsaba(NsabaBase):
                 else:
                     act_coeff = np.sum(weighted_means) / np.sum(weight)
                     self.term[term]['ns_act_vector'].append(act_coeff)
-=======
                 weight = self.__ns_weight_f(radii)
                 estimated_activation = self._get_act_values(coords, weight, term, ns_coord_act_df, method=estimation_method)
             if len(estimated_activation) == 0:
@@ -706,7 +704,7 @@ class Nsaba(NsabaBase):
             else:
                 act_coeff = np.sum(estimated_activation)  #  / np.sum(weight) commented out to see what happens
                 self.term[term]['ns_act_vector'].append(act_coeff)
->>>>>>> f5e917ca8716185fddaa6d6197779d53278fb897
+
 
     @preprint('This may take a few minutes...')
     def _sphere_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii, smoothing='gaussian'):
@@ -778,9 +776,7 @@ class Nsaba(NsabaBase):
             print "Test: f(e) = %.2f" % f(np.e)
             self._ns_weight_f = f
         except TypeError:
-<<<<<<< HEAD
             raise ValueError("'f' is improper, ensure 'f' receives only one parameter and returns a numeric type")
-=======
             print "'f' is improper, ensure 'f' receives only one parameter and returns a numeric type"
 
 
@@ -805,4 +801,4 @@ def get_gene_info(path, gene_ids):
         else:
             print str(gene_id)+' must be a str'
     return output
->>>>>>> f5e917ca8716185fddaa6d6197779d53278fb897
+
