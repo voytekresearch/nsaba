@@ -274,6 +274,37 @@ class Nsaba(NsabaBase):
             # Q!: Alternative scheme?
             self.ge[entrez_id] = np.mean(ge_mat, axis=1)
 
+    def ge_ratio(self, entrez_ids):
+        """
+        Calculates the ratio of gene expression at each ABA sampled MNI coordinate.
+
+        Parameters
+        ----------
+        entrez_ids: (tuple-like) 2
+            Entrez IDs of genes whose expression ratio is to be calculated.
+
+        Returns
+        -------
+        ratio: np.array() [1 x N]
+            Array of ratios of gene expression at each ABA sampled MNI coordinate,
+            where N is the number of sampled locations.
+        """
+
+        if len(entrez_ids) != 2:
+            raise ValueError("Invalid parameter form: entrez_ids should be in a 2-tuple")
+        self._check_entrez_struct(entrez_ids)
+
+        for entrez in entrez_ids:
+            if entrez not in self.ge:
+                self.get_aba_ge([entrez])
+
+        ei1, ei2 = entrez_ids
+
+        ratio = self.ge[ei1]/self.ge[ei2]
+
+        return ratio
+
+
     def pickle_ge(self, pkl_file="Nsaba_ABA_ge.pkl", output_dir='.'):
         """
         Stores Nsaba.ge as pickle named by 'pkl_file' in directory 'output_dir'.
