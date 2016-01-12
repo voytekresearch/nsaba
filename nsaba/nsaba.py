@@ -274,6 +274,37 @@ class Nsaba(NsabaBase):
             # Q!: Alternative scheme?
             self.ge[entrez_id] = np.mean(ge_mat, axis=1)
 
+    def ge_ratio(self, entrez_ids):
+        """
+        Calculates the ratio of gene expression at each ABA sampled MNI coordinate.
+
+        Parameters
+        ----------
+        entrez_ids: (tuple-like) 2
+            Entrez IDs of genes whose expression ratio is to be calculated.
+
+        Returns
+        -------
+        ratio: np.array() [1 x N]
+            Array of ratios of gene expression at each ABA sampled MNI coordinate,
+            where N is the number of sampled locations.
+        """
+
+        if len(entrez_ids) != 2:
+            raise ValueError("Invalid parameter form: entrez_ids should be in a 2-tuple")
+        self._check_entrez_struct(entrez_ids)
+
+        for entrez in entrez_ids:
+            if entrez not in self.ge:
+                self.get_aba_ge([entrez])
+
+        ei1, ei2 = entrez_ids
+
+        ratio = self.ge[ei1]/self.ge[ei2]
+
+        return ratio
+
+
     def pickle_ge(self, pkl_file="Nsaba_ABA_ge.pkl", output_dir='.'):
         """
         Stores Nsaba.ge as pickle named by 'pkl_file' in directory 'output_dir'.
@@ -587,7 +618,6 @@ class Nsaba(NsabaBase):
             Returns a list of len(no_ids) lists containing a namedtuple:
             "PMID_coord_pair". PMID_coord_pair contains two arguments: PMID
             and a list of coordinates (in tuple form) for that study.
-
         """
         id_coord_pair = collections.namedtuple("PMID_coord_pair", "pmid coords")
         if term in self.term:
@@ -657,38 +687,49 @@ class Nsaba(NsabaBase):
         r, inds = coord_tree.query(xyz, k)
         return inds[r < max_rad], r[r < max_rad]
 
-    def _get_act_values(self, bucket, weight, term, ns_coord_act_df, method='mean'):
+    def _get_act_values(self, bucket, weight, term, ns_coord_act_df):
         """Returns weighted NS activation """
         bucket_act_vec = []
         for coords in bucket:
             coord = ns_coord_act_df.ix[(ns_coord_act_df['x'] == coords[0])
                                     & (ns_coord_act_df['y'] == coords[1])
                                     & (ns_coord_act_df['z'] == coords[2])][term]
-            if method == 'mean':
-                bucket_act_vec.append(coord.mean())
-            if method == 'sum':
-                bucket_act_vec.append(coord.sum())
-            if method == 'max':
-                bucket_act_vec.append(coord.max())
-
+            bucket_act_vec.append(coord.mean())
 
         return np.array(bucket_act_vec)*weight
 
     @preprint('This may take a few minutes...')
-    def _knn_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii, k, smoothing='gaussian',
-                    estimation_method='mean'):
+    def _knn_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii, k, smoothing='gaussian'):
         """KNN method """
         for irow, xyz in enumerate(self._aba['mni_coords'].data):
             coord_inds, radii = self._knn_search(xyz, ns_coord_tree, search_radii, k)
             coords = ns_coord_tree.data[coord_inds]
-            if smoothing == 'flat':
-                weight = [1 for r in radii]
-                estimated_activation = self._get_act_values(coords, weight, term, ns_coord_act_df, method=estimation_method)
+
+            #  pretty sketchy
+            if smoothing == 'sum':
+                void_test = []
+                summed_activation = 0
+                for coord in coords:
+                    this_coord = ns_coord_act_df.ix[(ns_coord_act_df['x'] == coord[0])
+                                        & (ns_coord_act_df['y'] == coord[1])
+                                        & (ns_coord_act_df['z'] == coord[2])][term]
+                    summed_activation += np.sum(this_coord)
+                    void_test.append(summed_activation)
+
+                if len(void_test) == 0:
+                    self.term[term]['aba_void_indices'].append(irow)
+                else:
+                    self.term[term]['ns_act_vector'].append(summed_activation)
 
             if smoothing == 'gaussian':
                 gaussian_window = gaussian(len(radii)*2+1, std=2)  # std 2 is arbitrary but looks nice
                 weight = [gaussian_window[r+len(radii)-1] for r in radii]
-                estimated_activation = self._get_act_values(coords, weight, term, ns_coord_act_df, method=estimation_method)
+                weighted_means = self._get_act_values(coords, weight, term, ns_coord_act_df)
+                if len(weighted_means) == 0:
+                    self.term[term]['aba_void_indices'].append(irow)
+                else:
+                    act_coeff = np.sum(weighted_means) / np.sum(weight)
+                    self.term[term]['ns_act_vector'].append(act_coeff)
 
             else:
                 weight = self._ns_weight_f(radii)
@@ -698,14 +739,6 @@ class Nsaba(NsabaBase):
                 else:
                     act_coeff = np.sum(weighted_means) / np.sum(weight)
                     self.term[term]['ns_act_vector'].append(act_coeff)
-                weight = self.__ns_weight_f(radii)
-                estimated_activation = self._get_act_values(coords, weight, term, ns_coord_act_df, method=estimation_method)
-            if len(estimated_activation) == 0:
-                self.term[term]['aba_void_indices'].append(irow)
-            else:
-                act_coeff = np.sum(estimated_activation)  #  / np.sum(weight) commented out to see what happens
-                self.term[term]['ns_act_vector'].append(act_coeff)
-
 
     @preprint('This may take a few minutes...')
     def _sphere_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii, smoothing='gaussian'):
@@ -732,7 +765,7 @@ class Nsaba(NsabaBase):
                 act_coeff = sphere_vals[0] / sphere_vals[1]
                 self.term[term]['ns_act_vector'].append(act_coeff)
 
-    def get_ns_act(self, term, thresh=-1, method='knn', smoothing='gaussian', search_radii=3, k=None, estimation_method='mean'):
+    def get_ns_act(self, term, thresh=-1, method='knn', smoothing='gaussian', search_radii=3, k=None):
         """Generates NS activation vector about ABA MNI coordinates  timed at 26.1 s"""
         if not self.is_term(term):
             raise ValueError("'%s' is not a registered term." % term)
@@ -748,7 +781,7 @@ class Nsaba(NsabaBase):
         if method == 'knn':
             if k is None:
                 k = 20
-            self._knn_method(term, ns_coord_act_df, ns_coord_tree, search_radii, k, smoothing=smoothing,estimation_method=estimation_method)
+            self._knn_method(term, ns_coord_act_df, ns_coord_tree, search_radii, k, smoothing=smoothing)
         elif method == 'sphere':
             if k is not None:
                 raise ValueError("'k' parameter cannot be used with 'sphere' method.")
@@ -778,28 +811,3 @@ class Nsaba(NsabaBase):
             self._ns_weight_f = f
         except TypeError:
             raise ValueError("'f' is improper, ensure 'f' receives only one parameter and returns a numeric type")
-            print "'f' is improper, ensure 'f' receives only one parameter and returns a numeric type"
-
-
-def load_gene_file(path='.'):
-    if isinstance(path, str):
-        gene_file = path+'gene_info.csv'
-        df = pd.read_csv(gene_file)
-        return df
-    else:
-        raise TypeError("gene no must be a string")
-
-
-def get_gene_info(path, gene_ids):
-    df = load_gene_file(path)
-    output = []
-    for gene_id in gene_ids:
-        if isinstance(gene_id, str):
-            if int(gene_id) in df['Entrez'].as_matrix():
-                output.append((df[df['Entrez'] == int(gene_id)].as_matrix()[0]))
-            else:
-                print 'Gene '+gene_id+' not found in NIH database'
-        else:
-            print str(gene_id)+' must be a str'
-    return output
-
