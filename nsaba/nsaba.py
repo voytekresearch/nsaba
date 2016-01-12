@@ -302,8 +302,9 @@ class Nsaba(NsabaBase):
 
         ratio = self.ge[ei1]/self.ge[ei2]
 
-        return ratio
+        self.ge[0] = ratio #check it simon
 
+        return ratio
 
     def pickle_ge(self, pkl_file="Nsaba_ABA_ge.pkl", output_dir='.'):
         """
@@ -319,6 +320,22 @@ class Nsaba(NsabaBase):
         """
 
         pickle.dump(self.ge, open(os.path.join(output_dir, pkl_file), 'wb'))
+        print "%s successfully created" % pkl_file
+
+    def pickle_ns(self, pkl_file="Nsaba_NS_act.pkl", output_dir='.'):
+        """
+        Stores Nsaba.ge as pickle named by 'pkl_file' in directory 'output_dir'.
+
+        Parameters
+        ----------
+        pkl_file: string, optional
+            Name of pickle file.
+        output_dir: string, optional
+            Name of directory the pickle is to be written to;
+            '/' automatically added via os.path.join.
+        """
+
+        pickle.dump(self.term, open(os.path.join(output_dir, pkl_file), 'wb'))
         print "%s successfully created" % pkl_file
 
     @preprint('This may take a minute or two ...')
@@ -337,6 +354,23 @@ class Nsaba(NsabaBase):
 
         self.ge = pickle.load(open(os.path.join(path, pkl_file), 'rb'))
         print "'ge' dictionary successfully loaded"
+
+    @preprint('This may take a minute or two ...')
+    def load_ns_pickle(self, pkl_file="Nsaba_NS_act.pkl", path='.'):
+        """
+        Loads pickle named by 'pkl_file' in directory 'output_dir' into Nsaba.term.
+
+        Parameters
+        ----------
+        pkl_file: string, optional
+            Name of pickle file.
+        path: string, optional
+            Path to directory the pickle is written to;
+            '/' automatically added via os.path.join.
+        """
+
+        self.term = pickle.load(open(os.path.join(path, pkl_file), 'rb'))
+        print "term dictionary successfully loaded"
 
     def is_gene(self, gene):
         """
@@ -770,25 +804,31 @@ class Nsaba(NsabaBase):
         if not self.is_term(term):
             raise ValueError("'%s' is not a registered term." % term)
 
-        ns_coord_tree, ns_coord_act_df = self._term_to_coords(term, thresh)
+        try:
+            self.term[term]
+            print term + ' has been loaded'
+        except KeyError:
+            print 'estimating term'
 
-        self.term[term] = {}
-        self.term[term]['threshold'] = thresh
-        self.term[term]['search_radius'] = search_radii
-        self.term[term]['ns_act_vector'] = []
-        self.term[term]['aba_void_indices'] = []
+            ns_coord_tree, ns_coord_act_df = self._term_to_coords(term, thresh)
 
-        if method == 'knn':
-            if k is None:
-                k = 20
-            self._knn_method(term, ns_coord_act_df, ns_coord_tree, search_radii, k, smoothing=smoothing)
-        elif method == 'sphere':
-            if k is not None:
-                raise ValueError("'k' parameter cannot be used with 'sphere' method.")
-            self._sphere_method(term, ns_coord_act_df, ns_coord_tree, search_radii)
-        else:
-            raise TypeError("'%s' is not a valid parameter value for 'method' parameter, use either 'knn' or 'sphere"
-                            % method)
+            self.term[term] = {}
+            self.term[term]['threshold'] = thresh
+            self.term[term]['search_radius'] = search_radii
+            self.term[term]['ns_act_vector'] = []
+            self.term[term]['aba_void_indices'] = []
+
+            if method == 'knn':
+                if k is None:
+                    k = 20
+                self._knn_method(term, ns_coord_act_df, ns_coord_tree, search_radii, k, smoothing=smoothing)
+            elif method == 'sphere':
+                if k is not None:
+                    raise ValueError("'k' parameter cannot be used with 'sphere' method.")
+                self._sphere_method(term, ns_coord_act_df, ns_coord_tree, search_radii)
+            else:
+                raise TypeError("'%s' is not a valid parameter value for 'method' parameter, use either 'knn' or 'sphere"
+                                % method)
 
     def make_ge_ns_mat(self, ns_term, entrez_ids):
         self._check_entrez_struct(entrez_ids)
