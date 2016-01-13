@@ -419,7 +419,7 @@ class Nsaba(NsabaBase):
         if len(coord) == 3 and not isinstance(coord, str):
             for i, coords in self._ns['id_dict'].items():
                 for this_coordinate in coords:
-                    if this_coordinate == coord:
+                    if this_coordinate == tuple(coord):
                         if i not in ids:
                             if self.is_id(i):
                                 ids.append(i)
@@ -518,14 +518,14 @@ class Nsaba(NsabaBase):
         """
 
         if self.is_id(study_id):
-            term_vector_off_by_1 = np.squeeze(self._ns['features_df'].loc[self._ns['features_df']['pmid']
-                                                                          == study_id].as_matrix())
+            term_vector_off_by_1 = np.squeeze(self._ns['features_df'].loc[
+                                   self._ns['features_df'].pmid == study_id].as_matrix())
             # Shifting to remove ID index from vector
             return term_vector_off_by_1[1:]
         else:
             raise ValueError("Invalid NS study ID; check 'study_id' parameter")
 
-    def coord_to_ns_act(self, coord):
+    def coord_to_ns_act(self, coord, return_type='list'):
         """
         Returns list of terms activations for a MNI coordinate
         for all NS terms.
@@ -535,11 +535,17 @@ class Nsaba(NsabaBase):
         coord: tuple-like (3)
             Reference MNI coordinate.
 
+        return_type: str
+            OPTIONS:
+                'dict': See Returns.
+                'list': Returns list of activations for each term.
+                OTHER: Raises ValueError.
+
         Returns
         -------
-        terms: list
-            Terms activations about coord. If no activation data
-            is at coord then an empty list is returned.
+        terms: dict OR list
+            A dictionary with (term: activation) key pairs for
+            the specified MNI coordinate.
         """
         ids = self.coord_to_ids(coord)
         if len(ids) == 1:
@@ -550,8 +556,15 @@ class Nsaba(NsabaBase):
                 temp.append(self._id_to_ns_act(multiple_id))
                 terms = np.mean(temp, 0)
         else:
-            terms = []
-        return terms
+            return []
+
+        # [1:] to remove 'PMID' column header
+        if return_type == 'dict':
+            return {term: act for term, act in zip(self._ns['features_df'].columns[1:], terms)}
+        elif return_type == 'list':
+            return terms
+        else:
+            raise ValueError("Invalid return_type argument; use 'list' or 'dict'.")
 
     def coords_to_ns_act(self, coords, term, search_radii=5):
         """
@@ -569,8 +582,9 @@ class Nsaba(NsabaBase):
 
         Returns
         -------
-        terms: list
-            Terms activations about coords for a given term.
+        terms: np.array [ 1 x len(coords) ]
+            KNN estimated term activations about coords for a given term.
+            Estimations are in order of coordinates supplied.
 
         """
         if self.is_term(term):
@@ -595,9 +609,7 @@ class Nsaba(NsabaBase):
                         term_act = self.coord_to_ns_act(np.floor(temp_coord))[term_index]
                         if term_act > 0:
                             term_acts.append(sum(np.squeeze(term_acts * self._ns_weight_f(r))))
-            return term_vector
-        else:
-            raise TypeError("'%s' is not a valid term." % term)
+            return np.squeeze(term_vector)
 
     def term_to_coords(self, term, no_ids=3):
         """
@@ -620,7 +632,7 @@ class Nsaba(NsabaBase):
             and a list of coordinates (in tuple form) for that study.
         """
         id_coord_pair = collections.namedtuple("PMID_coord_pair", "pmid coords")
-        if term in self.term:
+        if self.is_term(term):
             try:
                 self._ns['id_dict'][24379394]
             except KeyError:
@@ -634,6 +646,8 @@ class Nsaba(NsabaBase):
                 if self.is_id(pmid):
                     coords.append(id_coord_pair(pmid, self._ns['id_dict'][pmid]))
             return coords
+        else:
+            raise ValueError("No previous estimation found for '%s'." % term)
 
     def _term_to_coords(self, term, thresh=0):
         """
@@ -766,7 +780,7 @@ class Nsaba(NsabaBase):
                 self.term[term]['ns_act_vector'].append(act_coeff)
 
     def get_ns_act(self, term, thresh=-1, method='knn', smoothing='gaussian', search_radii=3, k=None):
-        """Generates NS activation vector about ABA MNI coordinates  timed at 26.1 s"""
+        """Generates NS activation vector about ABA MNI coordinates; timed at 26.1 s"""
         if not self.is_term(term):
             raise ValueError("'%s' is not a registered term." % term)
 
