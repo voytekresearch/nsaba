@@ -446,7 +446,8 @@ class NsabaAnalysis(object):
         ax.set_xlabel('effect sizes')
         ax.set_ylabel('frequency')
 
-        offsetter = 450/len(genes_of_interest)
+        if genes_of_interest is not []:
+            offsetter = 450/len(genes_of_interest)
         for rec in ttest_metrics['results']:
             if int(rec.entrez) in genes_of_interest:
                 plt.plot([rec.cohen_d, rec.cohen_d], [0, offsetter])
