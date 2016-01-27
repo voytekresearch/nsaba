@@ -6,4 +6,5 @@
 __all__ = ['nsaba', 'visualizer', 'builder', 'analysis']
 
 # Importing Nsaba into nsaba namespace
+
 from nsaba import Nsaba

@@ -1,7 +1,7 @@
 """
 visualizer.py:
 Visualization tools for nsaba module.
-Author: Torben Noto
+Author: Torben Noto & Simon Haxby
 """
 from nsaba import Nsaba
 import numpy as np
@@ -12,6 +12,9 @@ from nsabatools import not_operational, preprint
 
 
 class NsabaVisualizer(object):
+    """
+    Wraps around Nsaba object, providing visualization methods.
+    """
     def __init__(self, nsaba_obj):
         if type(nsaba_obj) == Nsaba:
             self.no = nsaba_obj
@@ -19,6 +22,17 @@ class NsabaVisualizer(object):
             raise ValueError("NsabaVisualizer() parameter not a Nsaba instance")
     
     def visualize_ge(self, gene, alpha=0.4):
+        """
+        Generates 3-D heat map of gene expression for a specified gene.
+
+        Parameters
+        ----------
+        gene : str
+            Entrez ID of gene for heat map generation.
+
+        alpha : float
+            Sets color density of coordinates used in heat map.
+        """
         for e in gene:
             if e in self.no.ge:
                 fig = plt.figure()
@@ -29,9 +43,9 @@ class NsabaVisualizer(object):
                 color_map.set_array(weights)
                 fig.colorbar(color_map)
 
-                x = self.no.aba['mni_coords'].data[:, 0]
-                y = self.no.aba['mni_coords'].data[:, 1]
-                z = self.no.aba['mni_coords'].data[:, 2]
+                x = self.no._aba['mni_coords'].data[:, 0]
+                y = self.no._aba['mni_coords'].data[:, 1]
+                z = self.no._aba['mni_coords'].data[:, 2]
 
                 ax.scatter(x, y, z, c=colors, alpha=alpha)
             else:
@@ -39,21 +53,34 @@ class NsabaVisualizer(object):
         ax.set_title('Gene Expression of gene ID ' + str(gene))
 
     def visualize_ns(self, term, no_ids=10, alpha=0.2):
-        """Visualize the neural heat map of a term. no_ids determines how specific the map is"""
+        """
+        Generates 3-D heat map of term activation for a specified term.
+
+        Parameters
+        ----------
+        gene : str
+            Entrez ID of gene for heat map generation.
+
+        no_ids : int
+            Sets specificity of heat map. // More detail needed
+
+        alpha : float
+            Sets color density of coordinates used in heat map.
+        """
         if term in self.no.term:
             try:
-                len(self.no.ns['id_dict'])
+                len(self.no._ns['id_dict'])
             except KeyError:
                 self.no.ns_load_id_dict()
-            heat = self.no.ns['features_df'][term]
+            heat = self.no._ns['features_df'][term]
             sorted_heat_vals = sorted(enumerate(heat), key=lambda x: x[1], reverse=True)[0:no_ids]
             weights = zip(*sorted_heat_vals)[1]
             inds = zip(*sorted_heat_vals)[0]
-            pmids = [self.no.ns['features_df']['pmid'].ix[ind] for ind in inds]
+            pmids = [self.no._ns['features_df']['pmid'].ix[ind] for ind in inds]
             all_coords = []
             for pmid in pmids:
-                if len(self.no.ns['database_df'].loc[self.no.ns['database_df']['id'] == pmid]) > 0:
-                    all_coords.append(self.no.ns['id_dict'][pmid])
+                if len(self.no._ns['database_df'].loc[self.no._ns['database_df']['id'] == pmid]) > 0:
+                    all_coords.append(self.no._ns['id_dict'][pmid])
             xvals = []
             yvals = []
             zvals = []
@@ -75,14 +102,17 @@ class NsabaVisualizer(object):
             ax.scatter(xvals, yvals, zvals, c=colors, alpha=alpha)
             ax.set_title('Heat map of ' + str(term))
         else:
-            print 'Term '+term + ' has not been initialized. Use self.no.get_ns_act(' + term + ',thresh = 0.01)'
+            print 'Term '+term + ' has not been initialized. Use self.no.get_ns_act(' + term + ')'
 
-    @not_operational  # uses random coords instead of most active coords
+    @not_operational
     def visualize_ns_old(self, term, points=200):
+        """
+        Use randomly selected coordinates instead of most active
+        """
         if term in self.no.term:
-            term_index = self.no.ns['features_df'].columns.get_loc(term)
-            rand_point_inds = np.random.random_integers(0, len(np.squeeze(zip(self.no.ns['mni_coords'].data))), points)
-            rand_points = np.squeeze(zip(self.no.ns['mni_coords'].data))[rand_point_inds]
+            term_index = self.no._ns['features_df'].columns.get_loc(term)
+            rand_point_inds = np.random.random_integers(0, len(np.squeeze(zip(self.no._ns['mni_coords'].data))), points)
+            rand_points = np.squeeze(zip(self.no._ns['mni_coords'].data))[rand_point_inds]
             weights = []
             inds_of_real_points_with_no_fucking_missing_study_ids = []
             for rand_point in range(len(rand_points)):
@@ -95,19 +125,48 @@ class NsabaVisualizer(object):
             color_map = cm.ScalarMappable(cmap=cm.jet)
             color_map.set_array(weights)
             fig.colorbar(color_map)
-            x = self.no.ns['mni_coords'].data[inds_of_real_points_with_no_fucking_missing_study_ids, 0]
-            y = self.no.ns['mni_coords'].data[inds_of_real_points_with_no_fucking_missing_study_ids, 1]
-            z = self.no.ns['mni_coords'].data[inds_of_real_points_with_no_fucking_missing_study_ids, 2]
+            x = self.no._ns['mni_coords'].data[inds_of_real_points_with_no_fucking_missing_study_ids, 0]
+            y = self.no._ns['mni_coords'].data[inds_of_real_points_with_no_fucking_missing_study_ids, 1]
+            z = self.no._ns['mni_coords'].data[inds_of_real_points_with_no_fucking_missing_study_ids, 2]
         else:
             print 'Term '+term + ' has not been initialized. Use self.no.get_ns_act(' + term + ',thresh = 0.01)'
         ax.scatter(x, y, z, c=colors, alpha=0.4)
         ax.set_title('Estimation of ' + term)
 
-    def visualize_ge_ns(self, gene, term, logy=False, logx=False):
-        # lol bonus method
-        self.visualize_ns_ge(self, term, gene, logy=logy, logx=logx)
+    @not_operational
+    def lstsq_ge_ns(self, gene, term, logy=False, logx=False):
+        self.lstsq_ns_ge(self, term, gene, logy=logy, logx=logx)
 
-    def visualize_ns_ge(self, term, gene, logy=False, logx=False, only_term=False):
+    def lstsq_ns_ge(self, term, gene, logy=False, logx=False, only_term=False):
+        """
+        Generates a linear regression plot for gene expression to
+        term activation.
+
+        Least squares solution is used.
+
+        Parameters
+        ----------
+        term : str
+            NS term to be linearly correlated/predicted with a given gene's
+            gene expression.
+
+        gene : str
+            Entrez ID of gene whose gene expression is to be used as
+            a linear predictor of term activation.
+
+        logy : bool
+            log-space of y-axis.
+
+        logx : bool
+            log-space of x-axis.
+
+         Returns
+        -------
+        correlation, [m,c] : np.array([2 x 2]), [2]
+            Returns a tuple consisting of the gene-term correlation matrix
+            and regression parameters.
+
+        """
         for g in gene:
             if g in self.no.ge:
                 if term in self.no.term:
@@ -133,30 +192,59 @@ class NsabaVisualizer(object):
 
                     # print 'Correlation between ' + term + ' and gene number ' + str(gene)
                     # print correlation
-                    # print 'Linear regression between ' + term + ' and gene number ' + str(gene) +' Slope =' + str(m) + ' y intercept = '+ str(c)
+                    # print 'Linear regression between ' + term + ' and gene number ' + str(gene)
+                    #       +' Slope =' + str(m) + ' y intercept = '+ str(c)
 
                     ax.plot(ge_ns_mat[:, 0], ge_ns_mat[:, 1], '.')
-                    ax.plot([min(ge_ns_mat[:, 0]), max(ge_ns_mat[:, 0])], [m*min(ge_ns_mat[:, 0])+c, m*max(ge_ns_mat[:, 0])+c], 'r')
+                    ax.plot([min(ge_ns_mat[:, 0]), max(ge_ns_mat[:, 0])], [m*min(ge_ns_mat[:, 0])+c,
+                                                                           m*max(ge_ns_mat[:, 0])+c], 'r')
                     ax.set_xlabel(str(gene))
                     ax.set_ylabel(term)
 
                     return correlation, [m, c]
                 else:
-                    print 'Term '+term + ' has not been initialized. Use self.no.get_ns_act(' + term + ',thresh = 0.01)'
+                    raise ValueError('Term '+term + ' has not been initialized. Use self.no.get_ns_act(' + term + ',thresh = 0.01)')
             else:
-                print 'Gene '+str(g) + ' has not been initialized. Use self.no.get_aba_ge([' + str(g) + '])'
+                raise ValueError('Gene '+str(g) + ' has not been initialized. Use self.no.get_aba_ge([' + str(g) + '])')
 
-    def visualize_ns_ns(self, term1, term2, logy=False, logx=False):
-        """Visualizing the relationship between two term vectors"""
+    def lstsq_ns_ns(self, term1, term2, logy=False, logx=False):
+        """
+        Generates a linear regression plot for term activation to
+        term activation.
+
+        Least squares solution is used.
+
+        Parameters
+        ----------
+        term1 : str
+            NS predictor term.
+
+        term2 : str
+            NS term to be linearly correlated/predicted with a predictor term's
+            term activation.
+
+        logy : bool
+            log-space of y-axis.
+
+        logx : bool
+            log-space of x-axis.
+
+        Returns
+        -------
+        correlation, [m,c] : np.array([2 x 2]), [2]
+            Returns a tuple consisting of the term-term correlation matrix
+            and regression parameters.
+
+        """
         if term1 in self.no.term:
             if term2 in self.no.term:
-                # correlation
+                # Correlation
                 correlation = np.corrcoef(self.no.term[term1]['ns_act_vector'], self.no.term[term2]['ns_act_vector'])
-                # linear regression
+                # linear Regression
                 regression_matrix = np.vstack([self.no.term[term1]['ns_act_vector'], np.ones(len(self.no.term[term1]['ns_act_vector']))]).T
                 m, c = np.linalg.lstsq(regression_matrix, self.no.term[term2]['ns_act_vector'])[0]
 
-                # plotting
+                # Plotting
                 fig = plt.figure()
                 ax = fig.add_subplot(111)
                 if logy:
@@ -164,28 +252,59 @@ class NsabaVisualizer(object):
                 if logx:
                     ax.set_xscale('log')
                 ax.plot(self.no.term[term1]['ns_act_vector'], self.no.term[term2]['ns_act_vector'], '.')
-                ax.plot([min(self.no.term[term1]['ns_act_vector']), max(self.no.term[term1]['ns_act_vector'])], [m*min(self.no.term[term2]['ns_act_vector'])+c, m*max(self.no.term[term2]['ns_act_vector'])+c], 'r')
+                ax.plot([min(self.no.term[term1]['ns_act_vector']), max(self.no.term[term1]['ns_act_vector'])],
+                        [m*min(self.no.term[term2]['ns_act_vector'])+c,
+                         m*max(self.no.term[term2]['ns_act_vector'])+c], 'r')
                 ax.set_xlabel(term1)
                 ax.set_ylabel(term2)
                 return correlation, [m, c]
             else:
-                print 'Term '+term2 + ' has not been initialized. Use self.no.get_ns_act(' + term2 + ',thresh = -1)'
+                raise ValueError('Term '+term2 + ' has not been initialized. Use self.no.get_ns_act(' + term2 + ',thresh = -1)')
         else:
-            print 'Term '+term1 + ' has not been initialized. Use self.no.get_ns_act(' + term1 + ',thresh = -1)'
+            raise ValueError('Term '+term1 + ' has not been initialized. Use self.no.get_ns_act(' + term1 + ',thresh = -1)')
 
-    def visualize_ge_ge(self, genes):
-        """Visualizing two gene vectors"""
+    def lstsq_ge_ge(self, gene1, gene2):
+        """
+        Generates a linear regression plot for gene expression
+        to gene expression.
+
+        Least squares solution is used.
+
+        Parameters
+        ----------
+        gene1 : str
+            Entrez ID of ABA predictor gene.
+
+        gene2 : str
+            Entrez ID of ABA gene to be linearly correlated/predicted with a predictor gene's
+            gene expression.
+
+        logy : bool
+            log-space of y-axis.
+
+        logx : bool
+            log-space of x-axis.
+
+        Returns
+        -------
+        correlation, [m,c] : np.array([2 x 2]), [2]
+            Returns a tuple consisting of the gene-gene correlation matrix
+            and regression parameters.
+
+        """
+
+        genes = [gene1, gene2]
+
         for gene in genes:
             if gene not in self.no.ge:
-                print 'Gene '+str(g) + ' has not been initialized. Use self.no.get_aba_ge([' + str(g) + '])'
-                return []
-        # correlation
+                raise ValueError('Gene '+str(g) + ' has not been initialized. Use self.no.get_aba_ge([' + str(g) + '])')
+        # Correlation
         correlation = np.corrcoef(self.no.ge[genes[0]], self.no.ge[genes[1]])
         # linear regression
         regression_matrix = np.vstack([self.no.ge[genes[0]], np.ones(len(self.no.ge[genes[0]]))]).T
         m, c = np.linalg.lstsq(regression_matrix, self.no.ge[genes[1]])[0]
 
-        # plotting
+        # Plotting
         fig = plt.figure()
         ax = fig.add_subplot(111)
         plt.plot(self.no.ge[genes[0]], self.no.ge[genes[1]], '.')

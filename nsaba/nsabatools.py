@@ -3,6 +3,7 @@ nsabatools.py
 Contains tools, classes and data structures for nsaba submodules.
 """
 
+from functools import wraps
 
 class ReadOnlyDict(dict):
     def __init__(self, *args, **kwargs):
@@ -17,6 +18,8 @@ class ReadOnlyDict(dict):
 
 def not_operational(func):
     """Decorater: Used for methods that may be imported and accidentally used."""
+
+    @wraps(func)
     def func_wrap(*args, **kwargs):
         raise ImportError("'%s': is still in development and not operational." % func.func_name)
     return func_wrap
@@ -28,6 +31,7 @@ class preprint(object):
         self.string = string
 
     def __call__(self, f):
+        @wraps(f)
         def f_wrapper(*args, **kwargs):
             print self.string
             return f(*args, **kwargs)

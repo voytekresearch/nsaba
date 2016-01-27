@@ -302,8 +302,6 @@ class Nsaba(NsabaBase):
 
         ratio = self.ge[ei1]/self.ge[ei2]
 
-        self.ge[0] = ratio #check it simon
-
         return ratio
 
     def pickle_ge(self, pkl_file="Nsaba_ABA_ge.pkl", output_dir='.'):
@@ -322,22 +320,6 @@ class Nsaba(NsabaBase):
         pickle.dump(self.ge, open(os.path.join(output_dir, pkl_file), 'wb'))
         print "%s successfully created" % pkl_file
 
-    def pickle_ns(self, pkl_file="Nsaba_NS_act.pkl", output_dir='.'):
-        """
-        Stores Nsaba.ge as pickle named by 'pkl_file' in directory 'output_dir'.
-
-        Parameters
-        ----------
-        pkl_file: string, optional
-            Name of pickle file.
-        output_dir: string, optional
-            Name of directory the pickle is to be written to;
-            '/' automatically added via os.path.join.
-        """
-
-        pickle.dump(self.term, open(os.path.join(output_dir, pkl_file), 'wb'))
-        print "%s successfully created" % pkl_file
-
     @preprint('This may take a minute or two ...')
     def load_ge_pickle(self, pkl_file="Nsaba_ABA_ge.pkl", path='.'):
         """
@@ -354,23 +336,6 @@ class Nsaba(NsabaBase):
 
         self.ge = pickle.load(open(os.path.join(path, pkl_file), 'rb'))
         print "'ge' dictionary successfully loaded"
-
-    @preprint('This may take a minute or two ...')
-    def load_ns_pickle(self, pkl_file="Nsaba_NS_act.pkl", path='.'):
-        """
-        Loads pickle named by 'pkl_file' in directory 'output_dir' into Nsaba.term.
-
-        Parameters
-        ----------
-        pkl_file: string, optional
-            Name of pickle file.
-        path: string, optional
-            Path to directory the pickle is written to;
-            '/' automatically added via os.path.join.
-        """
-
-        self.term = pickle.load(open(os.path.join(path, pkl_file), 'rb'))
-        print "term dictionary successfully loaded"
 
     def is_gene(self, gene):
         """
@@ -453,7 +418,7 @@ class Nsaba(NsabaBase):
         if len(coord) == 3 and not isinstance(coord, str):
             for i, coords in self._ns['id_dict'].items():
                 for this_coordinate in coords:
-                    if this_coordinate == coord:
+                    if this_coordinate == tuple(coord):
                         if i not in ids:
                             if self.is_id(i):
                                 ids.append(i)
@@ -552,14 +517,14 @@ class Nsaba(NsabaBase):
         """
 
         if self.is_id(study_id):
-            term_vector_off_by_1 = np.squeeze(self._ns['features_df'].loc[self._ns['features_df']['pmid']
-                                                                          == study_id].as_matrix())
+            term_vector_off_by_1 = np.squeeze(self._ns['features_df'].loc[
+                                   self._ns['features_df'].pmid == study_id].as_matrix())
             # Shifting to remove ID index from vector
             return term_vector_off_by_1[1:]
         else:
             raise ValueError("Invalid NS study ID; check 'study_id' parameter")
 
-    def coord_to_ns_act(self, coord):
+    def coord_to_ns_act(self, coord, return_type='list'):
         """
         Returns list of terms activations for a MNI coordinate
         for all NS terms.
@@ -569,11 +534,17 @@ class Nsaba(NsabaBase):
         coord: tuple-like (3)
             Reference MNI coordinate.
 
+        return_type: str
+            OPTIONS:
+                'dict': See Returns.
+                'list': Returns list of activations for each term.
+                OTHER: Raises ValueError.
+
         Returns
         -------
-        terms: list
-            Terms activations about coord. If no activation data
-            is at coord then an empty list is returned.
+        terms: dict OR list
+            A dictionary with (term: activation) key pairs for
+            the specified MNI coordinate.
         """
         ids = self.coord_to_ids(coord)
         if len(ids) == 1:
@@ -584,8 +555,15 @@ class Nsaba(NsabaBase):
                 temp.append(self._id_to_ns_act(multiple_id))
                 terms = np.mean(temp, 0)
         else:
-            terms = []
-        return terms
+            return []
+
+        # [1:] to remove 'PMID' column header
+        if return_type == 'dict':
+            return {term: act for term, act in zip(self._ns['features_df'].columns[1:], terms)}
+        elif return_type == 'list':
+            return terms
+        else:
+            raise ValueError("Invalid return_type argument; use 'list' or 'dict'.")
 
     def coords_to_ns_act(self, coords, term, search_radii=5):
         """
@@ -603,8 +581,9 @@ class Nsaba(NsabaBase):
 
         Returns
         -------
-        terms: list
-            Terms activations about coords for a given term.
+        terms: np.array [ 1 x len(coords) ]
+            KNN estimated term activations about coords for a given term.
+            Estimations are in order of coordinates supplied.
 
         """
         if self.is_term(term):
@@ -629,9 +608,7 @@ class Nsaba(NsabaBase):
                         term_act = self.coord_to_ns_act(np.floor(temp_coord))[term_index]
                         if term_act > 0:
                             term_acts.append(sum(np.squeeze(term_acts * self._ns_weight_f(r))))
-            return term_vector
-        else:
-            raise TypeError("'%s' is not a valid term." % term)
+            return np.squeeze(term_vector)
 
     def term_to_coords(self, term, no_ids=3):
         """
@@ -654,7 +631,7 @@ class Nsaba(NsabaBase):
             and a list of coordinates (in tuple form) for that study.
         """
         id_coord_pair = collections.namedtuple("PMID_coord_pair", "pmid coords")
-        if term in self.term:
+        if self.is_term(term):
             try:
                 self._ns['id_dict'][24379394]
             except KeyError:
@@ -668,6 +645,8 @@ class Nsaba(NsabaBase):
                 if self.is_id(pmid):
                     coords.append(id_coord_pair(pmid, self._ns['id_dict'][pmid]))
             return coords
+        else:
+            raise ValueError("No previous estimation found for '%s'." % term)
 
     def _term_to_coords(self, term, thresh=0):
         """
@@ -800,35 +779,29 @@ class Nsaba(NsabaBase):
                 self.term[term]['ns_act_vector'].append(act_coeff)
 
     def get_ns_act(self, term, thresh=-1, method='knn', smoothing='gaussian', search_radii=3, k=None):
-        """Generates NS activation vector about ABA MNI coordinates  timed at 26.1 s"""
+        """Generates NS activation vector about ABA MNI coordinates; timed at 26.1 s"""
         if not self.is_term(term):
             raise ValueError("'%s' is not a registered term." % term)
 
-        try:
-            self.term[term]
-            print term + ' has been loaded'
-        except KeyError:
-            print 'estimating term'
+        ns_coord_tree, ns_coord_act_df = self._term_to_coords(term, thresh)
 
-            ns_coord_tree, ns_coord_act_df = self._term_to_coords(term, thresh)
+        self.term[term] = {}
+        self.term[term]['threshold'] = thresh
+        self.term[term]['search_radius'] = search_radii
+        self.term[term]['ns_act_vector'] = []
+        self.term[term]['aba_void_indices'] = []
 
-            self.term[term] = {}
-            self.term[term]['threshold'] = thresh
-            self.term[term]['search_radius'] = search_radii
-            self.term[term]['ns_act_vector'] = []
-            self.term[term]['aba_void_indices'] = []
-
-            if method == 'knn':
-                if k is None:
-                    k = 20
-                self._knn_method(term, ns_coord_act_df, ns_coord_tree, search_radii, k, smoothing=smoothing)
-            elif method == 'sphere':
-                if k is not None:
-                    raise ValueError("'k' parameter cannot be used with 'sphere' method.")
-                self._sphere_method(term, ns_coord_act_df, ns_coord_tree, search_radii)
-            else:
-                raise TypeError("'%s' is not a valid parameter value for 'method' parameter, use either 'knn' or 'sphere"
-                                % method)
+        if method == 'knn':
+            if k is None:
+                k = 20
+            self._knn_method(term, ns_coord_act_df, ns_coord_tree, search_radii, k, smoothing=smoothing)
+        elif method == 'sphere':
+            if k is not None:
+                raise ValueError("'k' parameter cannot be used with 'sphere' method.")
+            self._sphere_method(term, ns_coord_act_df, ns_coord_tree, search_radii)
+        else:
+            raise TypeError("'%s' is not a valid parameter value for 'method' parameter, use either 'knn' or 'sphere"
+                            % method)
 
     def make_ge_ns_mat(self, ns_term, entrez_ids):
         self._check_entrez_struct(entrez_ids)

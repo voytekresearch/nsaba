@@ -10,7 +10,7 @@ import pandas as pd
 import os
 import random
 import urllib2
-from BeautifulSoup import BeautifulSoup
+from bs4 import BeautifulSoup
 from time import sleep
 from collections import namedtuple
 
@@ -35,7 +35,7 @@ def gene_info(eid):
             page_name = "http://www.ncbi.nlm.nih.gov/gene/?term=" + eid
             page = urllib2.urlopen(page_name)
             sleep(1+random.random())
-            soup = BeautifulSoup(page)
+            soup = BeautifulSoup(page, 'lxml')
             contents = []
             for ana in soup.findAll('dd'):
                 if ana.parent.name == 'dl':
