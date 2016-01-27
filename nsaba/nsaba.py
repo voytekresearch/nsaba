@@ -304,7 +304,6 @@ class Nsaba(NsabaBase):
 
         return ratio
 
-
     def pickle_ge(self, pkl_file="Nsaba_ABA_ge.pkl", output_dir='.'):
         """
         Stores Nsaba.ge as pickle named by 'pkl_file' in directory 'output_dir'.
