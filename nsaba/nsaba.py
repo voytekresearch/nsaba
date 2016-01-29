@@ -396,7 +396,7 @@ class Nsaba(NsabaBase):
 
     def coord_to_ids(self, coord):
         """
-        Uses the study dictionary above to find NS study ids from x,y,z coordinates.
+        Uses the study dictionary above to find NS study IDs from x,y,z coordinates.
 
         Parameters
         ----------
@@ -426,6 +426,7 @@ class Nsaba(NsabaBase):
         else:
             raise ValueError("Argument form improper; check function documentation.")
 
+    # RF
     def _coord_to_ge(self, coord, entrez_ids, search_radii=3, k=20):
         """
         Returns weighted ABA gene expression statistic for some MNI coordinate based
@@ -466,6 +467,7 @@ class Nsaba(NsabaBase):
             raise ValueError("MNI coordinate in improper form; must be 3-tuple-like")
         return ge_for_coord
 
+    # RF
     def coords_to_ge(self, coords, entrez_ids, search_radii=3, k=20):
         """
         Returns weighted ABA gene expression statistic for a list MNI coordinate based
@@ -524,6 +526,7 @@ class Nsaba(NsabaBase):
         else:
             raise ValueError("Invalid NS study ID; check 'study_id' parameter")
 
+    #RF
     def coord_to_ns_act(self, coord, return_type='list'):
         """
         Returns list of terms activations for a MNI coordinate
@@ -565,6 +568,7 @@ class Nsaba(NsabaBase):
         else:
             raise ValueError("Invalid return_type argument; use 'list' or 'dict'.")
 
+    #RF
     def coords_to_ns_act(self, coords, term, search_radii=5):
         """
         Returns a list NS activations at specified coordinates
@@ -610,6 +614,7 @@ class Nsaba(NsabaBase):
                             term_acts.append(sum(np.squeeze(term_acts * self._ns_weight_f(r))))
             return np.squeeze(term_vector)
 
+    #RF
     def term_to_coords(self, term, no_ids=3):
         """
         Returns coordinates associated with studies that have the
@@ -648,6 +653,7 @@ class Nsaba(NsabaBase):
         else:
             raise ValueError("No previous estimation found for '%s'." % term)
 
+    #RF
     def _term_to_coords(self, term, thresh=0):
         """
         Finds coordinates associated with a given term above
@@ -678,6 +684,7 @@ class Nsaba(NsabaBase):
             term_ids_act.rename(columns={'pmid': 'id'}, inplace=True)
             return ns_coord_tree, term_coords.merge(term_ids_act)
 
+    #X
     def _sphere(self, xyz, coord_tree, max_rad=5):
         """Returns 3D Array containing coordinates in each layer of the sphere """
         sphere_bucket = []
@@ -695,11 +702,13 @@ class Nsaba(NsabaBase):
 
         return [layer for layer in rev_iter]
 
+    #X
     def _knn_search(self, xyz, coord_tree, max_rad=5, k=20):
         """KNN search of NS coordinates about ABA coordinates """
         r, inds = coord_tree.query(xyz, k)
         return inds[r < max_rad], r[r < max_rad]
 
+    #X
     def _get_act_values(self, bucket, weight, term, ns_coord_act_df):
         """Returns weighted NS activation """
         bucket_act_vec = []
@@ -711,6 +720,7 @@ class Nsaba(NsabaBase):
 
         return np.array(bucket_act_vec)*weight
 
+    #X
     @preprint('This may take a few minutes...')
     def _knn_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii, k, smoothing='gaussian'):
         """KNN method """
@@ -753,6 +763,7 @@ class Nsaba(NsabaBase):
                     act_coeff = np.sum(weighted_means) / np.sum(weight)
                     self.term[term]['ns_act_vector'].append(act_coeff)
 
+    #x
     @preprint('This may take a few minutes...')
     def _sphere_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii, smoothing='gaussian'):
         """Sphere buckets method"""
@@ -778,6 +789,7 @@ class Nsaba(NsabaBase):
                 act_coeff = sphere_vals[0] / sphere_vals[1]
                 self.term[term]['ns_act_vector'].append(act_coeff)
 
+    #RF
     def get_ns_act(self, term, thresh=-1, method='knn', smoothing='gaussian', search_radii=3, k=None):
         """Generates NS activation vector about ABA MNI coordinates; timed at 26.1 s"""
         if not self.is_term(term):
@@ -803,6 +815,7 @@ class Nsaba(NsabaBase):
             raise TypeError("'%s' is not a valid parameter value for 'method' parameter, use either 'knn' or 'sphere"
                             % method)
 
+    #RF
     def make_ge_ns_mat(self, ns_term, entrez_ids):
         self._check_entrez_struct(entrez_ids)
 
@@ -818,6 +831,7 @@ class Nsaba(NsabaBase):
             raise ValueError("Either term['%s'] or one or more Entrez ID keys does not exist in ge; "
                              "please check arguments" % ns_term)
 
+    #X
     def set_ns_weight_f(self, f):
         try:
             print "Test: f(e) = %.2f" % f(np.e)
