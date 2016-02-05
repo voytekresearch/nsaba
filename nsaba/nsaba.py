@@ -276,7 +276,7 @@ class Nsaba(NsabaBase):
             ge_vec = np.mean(ge_mat, axis=1)
             self.ge[entrez_id] = {}
 
-            if coords == None:
+            if coords is None:
                 self.ge[entrez_id]['GE'] = ge_vec
                 self.ge[entrez_id]['coord_type'] = 'ABA'
 
@@ -290,7 +290,7 @@ class Nsaba(NsabaBase):
                 X = self._aba['mni_coords']
                 y = ge_vec
 
-                self.ge[entrez_id]['classifer'].fit(X,y)
+                self.ge[entrez_id]['classifer'].fit(X.data, y)
                 if 'store_coords' in kwargs:
                     if kwargs['store_coords']:
                         self.ge[entrez_id]['coords'] = coords
@@ -301,9 +301,6 @@ class Nsaba(NsabaBase):
                     self.ge[entrez_id]['coord_type'] = 'Custom'
 
                 self.ge[entrez_id]["GE"] = self.ge[entrez_id]['classifer'].predict(coords)
-
-    def build_ge_mat(self, entrez_ids):
-        print False
 
     def ge_ratio(self, entrez_ids, coords=None, **kwargs):
         """
@@ -601,53 +598,6 @@ class Nsaba(NsabaBase):
             return terms
         else:
             raise ValueError("Invalid return_type argument; use 'list' or 'dict'.")
-
-    @not_operational
-    def coords_to_ns_act(self, coords, term, search_radii=5):
-        """
-        Returns a list NS activations at specified coordinates
-        for a given term.
-
-        Parameters
-        ----------
-        coords: list-like
-            List of reference MNI coordinates for term activation
-        entrez_ids: list-like
-            Entrez IDs for gene expressions to be estimated around 'coord'.
-        search_radii: numeric, optional
-            Max search radii for radius neighbors regression (RNR)
-            gene expression estimation technique.
-
-        Returns
-        -------
-        terms: np.array [ 1 x len(coords) ]
-            RNR estimated term activations about coords for a given term.
-            Estimations are in order of coordinates supplied.
-
-        """
-        if self.is_term(term):
-            try:
-                self._ns['id_dict']
-            except KeyError:
-                self.ns_load_id_dict()
-            term_index = self._ns['features_df'].columns.get_loc(term)
-            term_vector = np.zeros((1, len(coords)))
-            c = 0
-            for coord in coords:
-                temp_term = self.coord_to_ns_act(coord)
-                if len(temp_term) > 0:
-                    term_vector[0, c] = temp_term[term_index]
-                    c += 1
-                else:
-                    r, inds = self._ns['mni_coords'].query(coord, search_radii)
-                    temp_coords = self._ns['mni_coords'].data[inds]
-                    term_acts = []
-
-                    for temp_coord in temp_coords:
-                        term_act = self.coord_to_ns_act(np.floor(temp_coord))[term_index]
-                        if term_act > 0:
-                            term_acts.append(sum(np.squeeze(term_acts * self.ns_weight_f(r))))
-            return np.squeeze(term_vector)
 
     @not_operational
     def term_to_id_coords(self, term, no_ids=3):
