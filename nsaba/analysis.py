@@ -536,14 +536,14 @@ class NsabaAnalysis(object):
         ax.set_ylabel('frequency')
 
         if genes_of_interest != []:
-            offsetter = 1000/len(genes_of_interest)
+            offsetter = 500/len(genes_of_interest)
             for r in xrange(len(r_values)):
                 if self.no.ge.keys()[r] in genes_of_interest:
                     plt.plot([r_values[r], r_values[r]], [0, offsetter])
                     plt.annotate('Gene:'+str(self.no.ge.keys()[r])+' rho='+str(r_values[r]),
                                  [r_values[r], offsetter])
                     if genes_of_interest != []:
-                        offsetter += 1000/len(genes_of_interest)
+                        offsetter += 500/len(genes_of_interest)
 
     def cohen_d_distr(self, ttest_metrics, genes_of_interest=None, return_fig=False):
         """Visualizing effect-size distribution (Cohen's d)"""
