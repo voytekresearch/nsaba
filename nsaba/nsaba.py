@@ -245,9 +245,9 @@ class Nsaba(NsabaBase):
             if isinstance(entrez_ids, str):
                 raise TypeError("Invalid parameter form; please contain entrez ids in iterable container")
 
-    def get_aba_ge(self, entrez_ids):
+    def est_aba_ge(self, entrez_ids, coords=None, **kwargs):
         """
-        Retrieves and stores gene expression coefficients in ABA dictionary based on a
+        Retrieves, estimates and stores gene expression coefficients in ABA dictionary based on a
         a passed list of NIH Entrez IDs.
 
         Parameters
@@ -272,12 +272,45 @@ class Nsaba(NsabaBase):
             ge_mat = ge_df.as_matrix().astype(float)[:, 1:].T
 
             # Take average gene expression across probes at a given sampled location.
-            # Q!: Alternative scheme?
-            self.ge[entrez_id] = np.mean(ge_mat, axis=1)
 
-    def ge_ratio(self, entrez_ids):
+            ge_vec = np.mean(ge_mat, axis=1)
+            self.ge[entrez_id] = {}
+
+            if coords == None:
+                self.ge[entrez_id]['GE'] = ge_vec
+                self.ge[entrez_id]['coord_type'] = 'ABA'
+
+            # Estimate gene expression at custom coordinates
+            else:
+                if 'knn_args' in kwargs:
+                    self.ge[entrez_id]['classifer'] = KNeighborsRegressor(**kwargs['knn_args'])
+                else:
+                    self.ge[entrez_id]['classifer'] = KNeighborsRegressor()
+
+                X = self._aba['mni_coords']
+                y = ge_vec
+
+                self.ge[entrez_id]['classifer'].fit(X,y)
+                if 'store_coords' in kwargs:
+                    if kwargs['store_coords']:
+                        self.ge[entrez_id]['coords'] = coords
+
+                if 'coord_type' in kwargs:
+                    self.ge[entrez_id]['coord_type'] = kwargs['coord_type']
+                else:
+                    self.ge[entrez_id]['coord_type'] = 'Custom'
+
+                self.ge[entrez_id]["GE"] = self.ge[entrez_id]['classifer'].predict(coords)
+
+    def build_ge_mat(self, entrez_ids):
+        print False
+
+    def ge_ratio(self, entrez_ids, coords=None, **kwargs):
         """
-        Calculates the ratio of gene expression at each ABA sampled MNI coordinate.
+        Calculates the ratio of gene expression at each ABA sampled MNI coordinate
+        or custom coordinates.
+
+        NOTE: This methods overwrites previously stored gene expression coefficients.
 
         Parameters
         ----------
@@ -288,20 +321,19 @@ class Nsaba(NsabaBase):
         -------
         ratio: np.array() [1 x N]
             Array of ratios of gene expression at each ABA sampled MNI coordinate,
-            where N is the number of sampled locations.
+            or at custom MNI coordinates where N is the number of sampled locations
+            or custom coordinates provided.
         """
 
         if len(entrez_ids) != 2:
             raise ValueError("Invalid parameter form: entrez_ids should be in a 2-tuple")
         self._check_entrez_struct(entrez_ids)
 
-        for entrez in entrez_ids:
-            if entrez not in self.ge:
-                self.get_aba_ge([entrez])
+        self.est_aba_ge(entrez_ids, coords=coords, **kwargs)
 
         ei1, ei2 = entrez_ids
 
-        ratio = self.ge[ei1]/self.ge[ei2]
+        ratio = self.ge[ei1]['GE']/self.ge[ei2]['GE']
 
         return ratio
 
@@ -428,6 +460,7 @@ class Nsaba(NsabaBase):
             raise ValueError("Argument form improper; check function documentation.")
 
     # KNN
+    @not_operational
     def _coord_to_ge(self, coord, entrez_ids, search_radii=3, k=20):
         """
         Returns weighted ABA gene expression statistic for some MNI coordinate based
@@ -469,6 +502,7 @@ class Nsaba(NsabaBase):
         return ge_for_coord
 
     # KNN
+    @not_operational
     def coords_to_ge(self, coords, entrez_ids, search_radii=3, k=20):
         """
         Returns weighted ABA gene expression statistic for a list MNI coordinate based
@@ -504,7 +538,7 @@ class Nsaba(NsabaBase):
 
         return np.array(ge_for_coords)
 
-    def _id_to_ns_act(self, study_id):
+    def id_to_ns_act(self, study_id):
         """
         Returns activations for all terms for a given study.
 
@@ -551,11 +585,11 @@ class Nsaba(NsabaBase):
         """
         ids = self.coord_to_ids(coord)
         if len(ids) == 1:
-            terms = self._id_to_ns_act(ids)
+            terms = self.id_to_ns_act(ids)
         elif len(ids) > 1:
             temp = []
             for multiple_id in ids:
-                temp.append(self._id_to_ns_act(multiple_id))
+                temp.append(self.id_to_ns_act(multiple_id))
                 terms = np.mean(temp, 0)
         else:
             return []
@@ -568,6 +602,7 @@ class Nsaba(NsabaBase):
         else:
             raise ValueError("Invalid return_type argument; use 'list' or 'dict'.")
 
+    @not_operational
     def coords_to_ns_act(self, coords, term, search_radii=5):
         """
         Returns a list NS activations at specified coordinates
@@ -614,6 +649,7 @@ class Nsaba(NsabaBase):
                             term_acts.append(sum(np.squeeze(term_acts * self.ns_weight_f(r))))
             return np.squeeze(term_vector)
 
+    @not_operational
     def term_to_id_coords(self, term, no_ids=3):
         """
         Returns coordinates associated with studies that have the
@@ -709,18 +745,21 @@ class Nsaba(NsabaBase):
 
         self.term[term]['classifer'].fit(X,y)
 
-        self.term[term]['ns_act_vector'] = self.term[term]['classifer'].predict(coords.data)
+        self.term[term]['act'] = self.term[term]['classifer'].predict(coords.data)
 
-
-    #RF
     def make_ge_ns_mat(self, ns_term, entrez_ids):
         self._check_entrez_struct(entrez_ids)
 
         if ns_term in self.term and all([key in self.ge for key in entrez_ids]):
             ge_ns_mat = []
+            act_vec_len = len(self.term[ns_term]['act'])
             for entrez_id in entrez_ids:
-                ge_ns_mat.append(self.ge[entrez_id])
-            ge_ns_mat.append(self.term[ns_term]['ns_act_vector'])
+                if len(self.ge[entrez_id]['GE']) == act_vec_len:
+                    ge_ns_mat.append(self.ge[entrez_id]['GE'])
+                else:
+                    raise ValueError("Size mismatch between ge[%d] and term[%s]['act']"
+                                     % (entrez_id, ns_term))
+            ge_ns_mat.append(self.term[ns_term]['act'])
             return np.vstack(ge_ns_mat).T
         else:
             raise ValueError("Either term['%s'] or one or more Entrez ID keys does not exist in ge; "

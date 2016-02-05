@@ -37,7 +37,7 @@ class NsabaVisualizer(object):
             if e in self.no.ge:
                 fig = plt.figure()
                 ax = fig.add_subplot(111, projection='3d')
-                weights = self.no.ge[e]
+                weights = self.no.ge[e]['GE']
                 colors = cm.jet(weights/max(weights))
                 color_map = cm.ScalarMappable(cmap=cm.jet)
                 color_map.set_array(weights)
@@ -239,10 +239,11 @@ class NsabaVisualizer(object):
         if term1 in self.no.term:
             if term2 in self.no.term:
                 # Correlation
-                correlation = np.corrcoef(self.no.term[term1]['ns_act_vector'], self.no.term[term2]['ns_act_vector'])
+                correlation = np.corrcoef(self.no.term[term1]['act'], self.no.term[term2]['act'])
                 # linear Regression
-                regression_matrix = np.vstack([self.no.term[term1]['ns_act_vector'], np.ones(len(self.no.term[term1]['ns_act_vector']))]).T
-                m, c = np.linalg.lstsq(regression_matrix, self.no.term[term2]['ns_act_vector'])[0]
+                regression_matrix = np.vstack([self.no.term[term1]['act'],
+                                               np.ones(len(self.no.term[term1]['act']))]).T
+                m, c = np.linalg.lstsq(regression_matrix, self.no.term[term2]['act'])[0]
 
                 # Plotting
                 fig = plt.figure()
@@ -251,10 +252,10 @@ class NsabaVisualizer(object):
                     ax.set_yscale('log')
                 if logx:
                     ax.set_xscale('log')
-                ax.plot(self.no.term[term1]['ns_act_vector'], self.no.term[term2]['ns_act_vector'], '.')
-                ax.plot([min(self.no.term[term1]['ns_act_vector']), max(self.no.term[term1]['ns_act_vector'])],
-                        [m*min(self.no.term[term2]['ns_act_vector'])+c,
-                         m*max(self.no.term[term2]['ns_act_vector'])+c], 'r')
+                ax.plot(self.no.term[term1]['act'], self.no.term[term2]['act'], '.')
+                ax.plot([min(self.no.term[term1]['act']), max(self.no.term[term1]['act'])],
+                        [m*min(self.no.term[term2]['act'])+c,
+                         m*max(self.no.term[term2]['act'])+c], 'r')
                 ax.set_xlabel(term1)
                 ax.set_ylabel(term2)
                 return correlation, [m, c]
@@ -298,17 +299,24 @@ class NsabaVisualizer(object):
         for gene in genes:
             if gene not in self.no.ge:
                 raise ValueError('Gene '+str(g) + ' has not been initialized. Use self.no.get_aba_ge([' + str(g) + '])')
+
+        if len(self.no.ge[genes[0]]['GE']) != len(self.no.ge[genes[1]]['GE']):
+            raise ValueError("'GE' size mismatched rerun Nsaba.est_aba_ge() again.")
+
+        g0 = self.no.ge[genes[0]]['GE']
+        g1 = self.no.ge[genes[1]]['GE']
         # Correlation
-        correlation = np.corrcoef(self.no.ge[genes[0]], self.no.ge[genes[1]])
+        correlation = np.corrcoef(g0, g1)
         # linear regression
-        regression_matrix = np.vstack([self.no.ge[genes[0]], np.ones(len(self.no.ge[genes[0]]))]).T
-        m, c = np.linalg.lstsq(regression_matrix, self.no.ge[genes[1]])[0]
+        regression_matrix = np.vstack([g0, np.ones(len(g0))]).T
+        m, c = np.linalg.lstsq(regression_matrix, g1)[0]
 
         # Plotting
         fig = plt.figure()
         ax = fig.add_subplot(111)
-        plt.plot(self.no.ge[genes[0]], self.no.ge[genes[1]], '.')
-        plt.plot([min(self.no.ge[genes[0]]), max(self.no.ge[genes[0]])], [m*min(self.no.ge[genes[1]])+c, m*max(self.no.ge[genes[1]])+c], 'r')
+        plt.plot(g0, g1, '.')
+        plt.plot([min(g0), max(g0)],
+                 [m*min(g1)+c, m*max(g1)+c], 'r')
         ax.set_xlabel(genes[0])
         ax.set_ylabel(genes[1])
         return correlation, [m, c]
