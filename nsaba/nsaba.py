@@ -14,7 +14,6 @@ import collections
 import numpy as np
 import pandas as pd
 from scipy import spatial
-from scipy.signal import gaussian
 
 from sklearn.neighbors import KNeighborsRegressor
 from nsabatools import not_operational, preprint
@@ -560,6 +559,9 @@ class Nsaba(NsabaBase):
 
     def coord_to_ns_act(self, coord, return_type='list'):
         """
+        -- LEGACY --
+        Used to support visualize_ns_old(); itself unsupported.
+
         Returns list of terms activations for a MNI coordinate
         for all NS terms.
 
