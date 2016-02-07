@@ -14,8 +14,8 @@ import collections
 import numpy as np
 import pandas as pd
 from scipy import spatial
-from scipy.signal import gaussian
 
+from sklearn.neighbors import KNeighborsRegressor
 from nsabatools import not_operational, preprint
 
 
@@ -180,7 +180,7 @@ class Nsaba(NsabaBase):
         self._check_static_members()
         self.ge = {}
         self.term = {}
-        self._ns_weight_f = lambda r: 1. / r ** 2
+        self.ns_weight_f = lambda r: 1. / np.power(r, 2)
 
     def get_ns_struct(self, key=None):
         """
@@ -244,9 +244,9 @@ class Nsaba(NsabaBase):
             if isinstance(entrez_ids, str):
                 raise TypeError("Invalid parameter form; please contain entrez ids in iterable container")
 
-    def get_aba_ge(self, entrez_ids):
+    def est_aba_ge(self, entrez_ids, coords=None, **kwargs):
         """
-        Retrieves and stores gene expression coefficients in ABA dictionary based on a
+        Retrieves, estimates and stores gene expression coefficients in ABA dictionary based on a
         a passed list of NIH Entrez IDs.
 
         Parameters
@@ -271,12 +271,42 @@ class Nsaba(NsabaBase):
             ge_mat = ge_df.as_matrix().astype(float)[:, 1:].T
 
             # Take average gene expression across probes at a given sampled location.
-            # Q!: Alternative scheme?
-            self.ge[entrez_id] = np.mean(ge_mat, axis=1)
 
-    def ge_ratio(self, entrez_ids):
+            ge_vec = np.mean(ge_mat, axis=1)
+            self.ge[entrez_id] = {}
+
+            if coords is None:
+                self.ge[entrez_id]['GE'] = ge_vec
+                self.ge[entrez_id]['coord_type'] = 'ABA'
+
+            # Estimate gene expression at custom coordinates
+            else:
+                if 'knn_args' in kwargs:
+                    self.ge[entrez_id]['classifer'] = KNeighborsRegressor(**kwargs['knn_args'])
+                else:
+                    self.ge[entrez_id]['classifer'] = KNeighborsRegressor()
+
+                X = self._aba['mni_coords']
+                y = ge_vec
+
+                self.ge[entrez_id]['classifer'].fit(X.data, y)
+                if 'store_coords' in kwargs:
+                    if kwargs['store_coords']:
+                        self.ge[entrez_id]['coords'] = coords
+
+                if 'coord_type' in kwargs:
+                    self.ge[entrez_id]['coord_type'] = kwargs['coord_type']
+                else:
+                    self.ge[entrez_id]['coord_type'] = 'Custom'
+
+                self.ge[entrez_id]["GE"] = self.ge[entrez_id]['classifer'].predict(coords)
+
+    def ge_ratio(self, entrez_ids, coords=None, **kwargs):
         """
-        Calculates the ratio of gene expression at each ABA sampled MNI coordinate.
+        Calculates the ratio of gene expression at each ABA sampled MNI coordinate
+        or custom coordinates.
+
+        NOTE: This methods overwrites previously stored gene expression coefficients.
 
         Parameters
         ----------
@@ -287,20 +317,19 @@ class Nsaba(NsabaBase):
         -------
         ratio: np.array() [1 x N]
             Array of ratios of gene expression at each ABA sampled MNI coordinate,
-            where N is the number of sampled locations.
+            or at custom MNI coordinates where N is the number of sampled locations
+            or custom coordinates provided.
         """
 
         if len(entrez_ids) != 2:
             raise ValueError("Invalid parameter form: entrez_ids should be in a 2-tuple")
         self._check_entrez_struct(entrez_ids)
 
-        for entrez in entrez_ids:
-            if entrez not in self.ge:
-                self.get_aba_ge([entrez])
+        self.est_aba_ge(entrez_ids, coords=coords, **kwargs)
 
         ei1, ei2 = entrez_ids
 
-        ratio = self.ge[ei1]/self.ge[ei2]
+        ratio = self.ge[ei1]['GE']/self.ge[ei2]['GE']
 
         return ratio
 
@@ -396,7 +425,7 @@ class Nsaba(NsabaBase):
 
     def coord_to_ids(self, coord):
         """
-        Uses the study dictionary above to find NS study ids from x,y,z coordinates.
+        Uses the study dictionary above to find NS study IDs from x,y,z coordinates.
 
         Parameters
         ----------
@@ -426,82 +455,7 @@ class Nsaba(NsabaBase):
         else:
             raise ValueError("Argument form improper; check function documentation.")
 
-    def _coord_to_ge(self, coord, entrez_ids, search_radii=3, k=20):
-        """
-        Returns weighted ABA gene expression statistic for some MNI coordinate based
-        on a list of passed Entrez IDs.
-
-        Parameters
-        ----------
-        coord: tuple-like (3)
-            Reference MNI coordinate.
-        entrez_ids: list-like
-            Entrez IDs for gene expressions to be estimated around 'coord'.
-        search_radii: numeric, optional
-            Max search radii for KNN gene expression estimation technique.
-        k: int, optional
-            k parameter for KNN estimation.
-
-        Returns
-        -------
-        ge_for_coord: list [N]
-            Estimated gene expression at 'coord' for genes specified by 'entrez_ids'.
-            Where N is the size of 'entrez_ids' (number of genes for expression
-            to be estimated).
-
-        """
-
-        ge_for_coord = []
-        if len(coord) == 3 and not isinstance(coord, str):
-            for entrez_id in entrez_ids:
-                coord_inds, radii = self._knn_search(coord, self._aba['mni_coords'], search_radii, k)
-                if len(coord_inds) == 0:
-                    # print "No ABA coordinates are within search radius of specified coordinate"
-                    break
-                weight = self._ns_weight_f(radii)
-                local_ge = self.ge[entrez_id][coord_inds]
-                weighted_ge_mean = np.sum(local_ge*weight)/np.sum(weight)
-                ge_for_coord.append(weighted_ge_mean)
-        else:
-            raise ValueError("MNI coordinate in improper form; must be 3-tuple-like")
-        return ge_for_coord
-
-    def coords_to_ge(self, coords, entrez_ids, search_radii=3, k=20):
-        """
-        Returns weighted ABA gene expression statistic for a list MNI coordinate based
-        on a list of passed Entrez IDs.
-
-        Parameters
-        ----------
-        coords: list-like
-            List of reference MNI coordinates for gene expression to be estimated at.
-        entrez_ids: list-like
-            Entrez IDs for gene expressions to be estimated around 'coord'.
-        search_radii: numeric, optional
-            Max search radii for KNN gene expression estimation technique.
-        k: int, optional
-            k parameter for KNN estimation.
-
-        Returns
-        -------
-        np.array(ge_coords): numpy.array [M x N]
-            Returns as a matrix of M coordinates by N estimated gene expression
-            coefficients. See _coord_to_ge() documentation for more information.
-
-        """
-        self._check_entrez_struct(entrez_ids)
-        if not all([key in self.ge for key in entrez_ids]):
-            raise ValueError("One or more Entrez IDs not loaded into ge.")
-
-        ge_for_coords = []
-        for coord in coords:
-            ge_for_coord = self._coord_to_ge(coord, entrez_ids, search_radii, k)
-            if ge_for_coords > 0:
-                ge_for_coords.append(ge_for_coord)
-
-        return np.array(ge_for_coords)
-
-    def _id_to_ns_act(self, study_id):
+    def id_to_ns_act(self, study_id):
         """
         Returns activations for all terms for a given study.
 
@@ -526,6 +480,9 @@ class Nsaba(NsabaBase):
 
     def coord_to_ns_act(self, coord, return_type='list'):
         """
+        -- LEGACY --
+        Used to support visualize_ns_old(); itself unsupported.
+
         Returns list of terms activations for a MNI coordinate
         for all NS terms.
 
@@ -548,11 +505,11 @@ class Nsaba(NsabaBase):
         """
         ids = self.coord_to_ids(coord)
         if len(ids) == 1:
-            terms = self._id_to_ns_act(ids)
+            terms = self.id_to_ns_act(ids)
         elif len(ids) > 1:
             temp = []
             for multiple_id in ids:
-                temp.append(self._id_to_ns_act(multiple_id))
+                temp.append(self.id_to_ns_act(multiple_id))
                 terms = np.mean(temp, 0)
         else:
             return []
@@ -565,52 +522,8 @@ class Nsaba(NsabaBase):
         else:
             raise ValueError("Invalid return_type argument; use 'list' or 'dict'.")
 
-    def coords_to_ns_act(self, coords, term, search_radii=5):
-        """
-        Returns a list NS activations at specified coordinates
-        for a given term.
-
-        Parameters
-        ----------
-        coords: list-like
-            List of reference MNI coordinates for term activation
-        entrez_ids: list-like
-            Entrez IDs for gene expressions to be estimated around 'coord'.
-        search_radii: numeric, optional
-            Max search radii for KNN gene expression estimation technique.
-
-        Returns
-        -------
-        terms: np.array [ 1 x len(coords) ]
-            KNN estimated term activations about coords for a given term.
-            Estimations are in order of coordinates supplied.
-
-        """
-        if self.is_term(term):
-            try:
-                self._ns['id_dict']
-            except KeyError:
-                self.ns_load_id_dict()
-            term_index = self._ns['features_df'].columns.get_loc(term)
-            term_vector = np.zeros((1, len(coords)))
-            c = 0
-            for coord in coords:
-                temp_term = self.coord_to_ns_act(coord)
-                if len(temp_term) > 0:
-                    term_vector[0, c] = temp_term[term_index]
-                    c += 1
-                else:
-                    r, inds = self._ns['mni_coords'].query(coord, search_radii)
-                    temp_coords = self._ns['mni_coords'].data[inds]
-                    term_acts = []
-
-                    for temp_coord in temp_coords:
-                        term_act = self.coord_to_ns_act(np.floor(temp_coord))[term_index]
-                        if term_act > 0:
-                            term_acts.append(sum(np.squeeze(term_acts * self._ns_weight_f(r))))
-            return np.squeeze(term_vector)
-
-    def term_to_coords(self, term, no_ids=3):
+    @not_operational
+    def term_to_id_coords(self, term, no_ids=3):
         """
         Returns coordinates associated with studies that have the
         greatest term activation.
@@ -667,7 +580,7 @@ class Nsaba(NsabaBase):
         (spatial.KDTree, pandas.DataFrame)
 
         """
-        term_ids_act = self._ns['features_df'].loc[self._ns['features_df'][term] > thresh, ['pmid', term]]
+        term_ids_act = self._ns['features_df'].loc[self._ns['features_df'][term] >= thresh, ['pmid', term]]
         term_ids = term_ids_act['pmid'].tolist()
         term_coords = self._ns['database_df'].loc[self._ns['database_df']['id'].isin(term_ids)]
         try:
@@ -678,149 +591,50 @@ class Nsaba(NsabaBase):
             term_ids_act.rename(columns={'pmid': 'id'}, inplace=True)
             return ns_coord_tree, term_coords.merge(term_ids_act)
 
-    def _sphere(self, xyz, coord_tree, max_rad=5):
-        """Returns 3D Array containing coordinates in each layer of the sphere """
-        sphere_bucket = []
-        set_bucket = []
-
-        # Needs work; generalize
-        for i, r in enumerate(xrange(max_rad, 0, -1)):
-            pts = coord_tree.query_ball_point(xyz, r)
-            set_bucket.append(set(map(tuple, coord_tree.data[pts])))
-
-        for i in xrange(0, 3):
-            sphere_bucket.append(list(set_bucket[i].difference(set_bucket[i + 1])))
-        sphere_bucket.append(list(set_bucket[3]))
-        rev_iter = reversed(sphere_bucket)
-
-        return [layer for layer in rev_iter]
-
-    def _knn_search(self, xyz, coord_tree, max_rad=5, k=20):
-        """KNN search of NS coordinates about ABA coordinates """
-        r, inds = coord_tree.query(xyz, k)
-        return inds[r < max_rad], r[r < max_rad]
-
-    def _get_act_values(self, bucket, weight, term, ns_coord_act_df):
-        """Returns weighted NS activation """
-        bucket_act_vec = []
-        for coords in bucket:
-            coord = ns_coord_act_df.ix[(ns_coord_act_df['x'] == coords[0])
-                                    & (ns_coord_act_df['y'] == coords[1])
-                                    & (ns_coord_act_df['z'] == coords[2])][term]
-            bucket_act_vec.append(coord.mean())
-
-        return np.array(bucket_act_vec)*weight
-
-    @preprint('This may take a few minutes...')
-    def _knn_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii, k, smoothing='gaussian'):
-        """KNN method """
-        for irow, xyz in enumerate(self._aba['mni_coords'].data):
-            coord_inds, radii = self._knn_search(xyz, ns_coord_tree, search_radii, k)
-            coords = ns_coord_tree.data[coord_inds]
-
-            #  pretty sketchy
-            if smoothing == 'sum':
-                void_test = []
-                summed_activation = 0
-                for coord in coords:
-                    this_coord = ns_coord_act_df.ix[(ns_coord_act_df['x'] == coord[0])
-                                        & (ns_coord_act_df['y'] == coord[1])
-                                        & (ns_coord_act_df['z'] == coord[2])][term]
-                    summed_activation += np.sum(this_coord)
-                    void_test.append(summed_activation)
-
-                if len(void_test) == 0:
-                    self.term[term]['aba_void_indices'].append(irow)
-                else:
-                    self.term[term]['ns_act_vector'].append(summed_activation)
-
-            if smoothing == 'gaussian':
-                gaussian_window = gaussian(len(radii)*2+1, std=2)  # std 2 is arbitrary but looks nice
-                weight = [gaussian_window[r+len(radii)-1] for r in radii]
-                weighted_means = self._get_act_values(coords, weight, term, ns_coord_act_df)
-                if len(weighted_means) == 0:
-                    self.term[term]['aba_void_indices'].append(irow)
-                else:
-                    act_coeff = np.sum(weighted_means) / np.sum(weight)
-                    self.term[term]['ns_act_vector'].append(act_coeff)
-
-            else:
-                weight = self._ns_weight_f(radii)
-                weighted_means = self._get_act_values(coords, weight, term, ns_coord_act_df)
-                if len(weighted_means) == 0:
-                    self.term[term]['aba_void_indices'].append(irow)
-                else:
-                    act_coeff = np.sum(weighted_means) / np.sum(weight)
-                    self.term[term]['ns_act_vector'].append(act_coeff)
-
-    @preprint('This may take a few minutes...')
-    def _sphere_method(self, term, ns_coord_act_df, ns_coord_tree, search_radii, smoothing='gaussian'):
-        """Sphere buckets method"""
-        for irow, xyz in enumerate(self._aba['mni_coords'].data):
-            sphere_bucket = self._sphere(xyz, ns_coord_tree, search_radii)
-            sphere_vals = [0, 0]
-            for w, bucket in enumerate(sphere_bucket):
-                if smoothing == 'gaussian':
-                    gaussian_window = gaussian(len(w)*2+1, std=2)  # std 2 is arbitrary but looks nice
-                    weight = [gaussian_window[r+len(w)-1] for r in w]
-                else:
-                    weight = self._ns_weight_f(w + 1)
-                bucket_mean = np.mean(self._get_act_values(bucket, weight, term, ns_coord_act_df))
-                if np.isnan(bucket_mean):
-                    sphere_vals[0] += 0
-                    sphere_vals[1] += 0
-                else:
-                    sphere_vals[0] += bucket_mean
-                    sphere_vals[1] += weight
-            if sphere_vals[1] == 0:
-                self.term[term]['aba_void_indices'].append(irow)
-            else:
-                act_coeff = sphere_vals[0] / sphere_vals[1]
-                self.term[term]['ns_act_vector'].append(act_coeff)
-
-    def get_ns_act(self, term, thresh=-1, method='knn', smoothing='gaussian', search_radii=3, k=None):
+    def est_ns_act(self, term, coords=None, **kwargs):
         """Generates NS activation vector about ABA MNI coordinates; timed at 26.1 s"""
         if not self.is_term(term):
             raise ValueError("'%s' is not a registered term." % term)
 
-        ns_coord_tree, ns_coord_act_df = self._term_to_coords(term, thresh)
-
         self.term[term] = {}
-        self.term[term]['threshold'] = thresh
-        self.term[term]['search_radius'] = search_radii
-        self.term[term]['ns_act_vector'] = []
-        self.term[term]['aba_void_indices'] = []
 
-        if method == 'knn':
-            if k is None:
-                k = 20
-            self._knn_method(term, ns_coord_act_df, ns_coord_tree, search_radii, k, smoothing=smoothing)
-        elif method == 'sphere':
-            if k is not None:
-                raise ValueError("'k' parameter cannot be used with 'sphere' method.")
-            self._sphere_method(term, ns_coord_act_df, ns_coord_tree, search_radii)
+        if coords is None:
+            coords = self._aba['mni_coords']
+            self.term[term]['coord_type'] = 'ABA MNI'
         else:
-            raise TypeError("'%s' is not a valid parameter value for 'method' parameter, use either 'knn' or 'sphere"
-                            % method)
+            self.term[term]['coords'] = coords
+            if 'coord_type' in kwargs:
+                self.term[term]['coord_type'] = kwargs['coord_type']
+
+        ns_coord_tree, ns_coord_act_df = self._term_to_coords(term, 0)
+
+        if 'knn_args' in kwargs:
+            self.term[term]['classifer'] = KNeighborsRegressor(**kwargs['knn_args'])
+        else:
+            self.term[term]['classifer'] = KNeighborsRegressor()
+
+        X = ns_coord_tree.data
+        y = ns_coord_act_df[term].as_matrix()
+
+        self.term[term]['classifer'].fit(X,y)
+
+        self.term[term]['act'] = self.term[term]['classifer'].predict(coords.data)
 
     def make_ge_ns_mat(self, ns_term, entrez_ids):
         self._check_entrez_struct(entrez_ids)
 
         if ns_term in self.term and all([key in self.ge for key in entrez_ids]):
             ge_ns_mat = []
+            act_vec_len = len(self.term[ns_term]['act'])
             for entrez_id in entrez_ids:
-                aba_indices = np.array([i for i in xrange(len(self._aba['mni_coords'].data))
-                                        if i not in self.term[ns_term]['aba_void_indices']])
-                ge_ns_mat.append(self.ge[entrez_id][aba_indices])
-            ge_ns_mat.append(self.term[ns_term]['ns_act_vector'])
+                if len(self.ge[entrez_id]['GE']) == act_vec_len:
+                    ge_ns_mat.append(self.ge[entrez_id]['GE'])
+                else:
+                    raise ValueError("Size mismatch between ge[%d] and term[%s]['act']"
+                                     % (entrez_id, ns_term))
+            ge_ns_mat.append(self.term[ns_term]['act'])
             return np.vstack(ge_ns_mat).T
         else:
             raise ValueError("Either term['%s'] or one or more Entrez ID keys does not exist in ge; "
                              "please check arguments" % ns_term)
 
-    def set_ns_weight_f(self, f):
-        try:
-            print "Test: f(e) = %.2f" % f(np.e)
-            self._ns_weight_f = f
-        except TypeError:
-            raise ValueError("'f' is improper, ensure 'f' receives only one parameter and returns a numeric type")

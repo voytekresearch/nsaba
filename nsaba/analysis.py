@@ -44,6 +44,23 @@ class NsabaAnalysis(object):
         self.gene_rec = collections.namedtuple("gene_rec", "entrez cohen_d p_value")
         print "To use inline plotting functionality in Jupyter, '%matplotlib inline' must be enabled"
 
+    def _mask_check(self, mask, method):
+        """
+        Checks mask contains only zeros or ones.
+
+        Parameters
+        ----------
+        mask : np.array([ ABA samples x 1 ] )
+            Bool mask for splitting ABA samples into control and
+            functional groups.
+
+        method : str
+            See _split_mask().
+        """
+        if sum(mask) == 0 or sum(mask) == len(mask):
+            raise ValueError("No coordinates assigned to functional group; try another "
+                             "splitting method other than '%s.'" % method)
+
     def _split_mask(self, term_vec, method='quant', **kwargs):
         """
         Vector of term activations is split in to two groups; for
@@ -69,8 +86,9 @@ class NsabaAnalysis(object):
                                 and 15% of coordinates in activation.
         Returns
         -------
-        mask : np.array()
-
+        mask : np.array([ ABA samples x 1 ] )
+            Bool mask for splitting ABA samples into control and
+            functional groups.
 
         """
         if method == 'quant':
@@ -79,13 +97,15 @@ class NsabaAnalysis(object):
                 # NOTE!!: This value ^ has a dependence in term_ge_ttest_multi
             thres = np.percentile(term_vec, kwargs['quant'])
             mask = np.array([True if coeff > thres else False for coeff in term_vec])
+            self._mask_check(mask, method)
             return mask
         elif method == 'kmeans':
             X = [[x] for x in term_vec]
             init_clusters = np.array([[min(term_vec)], [max(term_vec)]])
             kmn = KMeans(n_clusters=2, init=init_clusters, n_init=1)
-            mask = kmn.fit_predict(X)
-            return mask.astype(bool)
+            mask = kmn.fit_predict(X).astype(bool)
+            self._mask_check(mask, method)
+            return mask
         elif method == 'mog':
             X = [[x] for x in term_vec]
             gm = mixture.GMM(n_components=2)
@@ -94,6 +114,7 @@ class NsabaAnalysis(object):
                 mask = np.array([True if gm.predict([[coeff]]) == 1 else False for coeff in term_vec])
             else:
                 mask = np.array([False if gm.predict([[coeff]]) == 1 else True for coeff in term_vec])
+            self._mask_check(mask, method)
             return mask
         else:
             raise ValueError("method parameter '%s' not recognized" % method)
@@ -153,7 +174,8 @@ class NsabaAnalysis(object):
 
         # T-Test
         print "t-value: %.4f \np-value: %.3E" % stats.ttest_ind(cont_grp, funct_grp)
-        print "Effect size: %.4f \n" % cohen_d(cont_grp, funct_grp, len(cont_grp), len(funct_grp))
+        print "Effect size: %.4f" % cohen_d(cont_grp, funct_grp, len(cont_grp), len(funct_grp))
+        print "Control/Functional Split: %d/%d\n" % (len(mask)-sum(mask), sum(mask))
         # Histogram/KDE Plots
         if graphops == 'density':
             ax = plt.axes()
@@ -514,14 +536,14 @@ class NsabaAnalysis(object):
         ax.set_ylabel('frequency')
 
         if genes_of_interest != []:
-            offsetter = 1000/len(genes_of_interest)
+            offsetter = 500/len(genes_of_interest)
             for r in xrange(len(r_values)):
                 if self.no.ge.keys()[r] in genes_of_interest:
                     plt.plot([r_values[r], r_values[r]], [0, offsetter])
                     plt.annotate('Gene:'+str(self.no.ge.keys()[r])+' rho='+str(r_values[r]),
                                  [r_values[r], offsetter])
                     if genes_of_interest != []:
-                        offsetter += 1000/len(genes_of_interest)
+                        offsetter += 500/len(genes_of_interest)
 
     def cohen_d_distr(self, ttest_metrics, genes_of_interest=None, return_fig=False):
         """Visualizing effect-size distribution (Cohen's d)"""

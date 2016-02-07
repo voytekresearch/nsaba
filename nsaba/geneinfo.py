@@ -3,16 +3,23 @@ geneinfo.py: methods for querying, saving
 and loading gene information for NIH
 database.
 
-Author: Torben Noto
+Author: Torben Noto & Simon Haxby
 """
 
 import pandas as pd
 import os
+import re
 import random
 import urllib2
-from bs4 import BeautifulSoup
 from time import sleep
 from collections import namedtuple
+
+from bs4 import BeautifulSoup
+from selenium import webdriver
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+
 
 def gene_info(eid):
     """
@@ -51,7 +58,6 @@ def gene_info(eid):
     else:
         raise TypeError("gene no must be a string")
 
-
 def load_gene_file(path='.'):
     """
     Loads file containing gene descriptions of genes specified by
@@ -78,7 +84,6 @@ def load_gene_file(path='.'):
         return df
     else:
         raise TypeError("Gene-file path must be a string")
-
 
 def get_gene_info(path, gene_ids):
     """
@@ -110,3 +115,59 @@ def get_gene_info(path, gene_ids):
         else:
             print 'Gene %s not found in NIH database' % gene_id
     return output
+
+def fetch_entrez_ids(term, id_num):
+    """
+    Returns Entrez IDs of genes most strongly associated a term from
+    www.genecard.org.
+
+    Parameters
+    ----------
+    term : str
+        Term for
+
+    id_num : str/int
+        The number of highest scored Entrez IDs for the specified term.
+
+    Returns
+    -------
+    entrez_ids : list
+        A list of 'id_num' top Entrez IDs associated with 'term'.
+    """
+    entrez_ids = []
+    strs = ["http://www.genecards.org/Search/Keyword?startPage=0&queryString=",
+            term, "&pageSize=", str(id_num)]
+    search_url = ''.join(strs)
+    driver = webdriver.PhantomJS()
+    driver.get(search_url)
+    print (search_url)
+    try:
+        # Waits for DOM to render the search results table before accessing elements.
+        check = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.ID, "searchResults")))
+    finally:
+        search_table = driver.find_element_by_id("searchResults")
+
+    top_genes = search_table.find_elements_by_class_name("gc-gene-symbol")
+    gene_urls = []
+    for gene in top_genes:
+        el = gene.find_element_by_tag_name("a")
+        gene_urls.append(el.get_attribute("href"))
+
+    for gene_url in gene_urls:
+        driver.get(gene_url)
+        try:
+            # Waits for DOM to render the page table before accessing elements.
+            check = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.CLASS_NAME, "gc-subsection")))
+        finally:
+            subsections = driver.find_elements_by_class_name("gc-subsection")
+
+        text = subsections[1].text
+        result = re.search("Entrez\sGene:\s([0-9]*)", text)
+        entrez_ids.append(result.group(1))
+        print (entrez_ids[-1])
+
+    driver.close()
+
+    return entrez_ids
