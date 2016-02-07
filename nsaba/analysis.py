@@ -161,7 +161,7 @@ class NsabaAnalysis(object):
                     _split_mask()
 
         """
-        analymat = self.no.make_ge_ns_mat(term, [gene])
+        analymat = self.no.matrix_builder([term], [gene])
 
         # Splitting groups
 
@@ -223,7 +223,7 @@ class NsabaAnalysis(object):
         """
         if term not in self.no.term:
             raise ValueError("Term activation not generated for '%s" % term)
-        ge_mat = self.no.make_ge_ns_mat(term, self.no.ge.keys())
+        ge_mat = self.no.matrix_builder([term], self.no.ge.keys())
 
         # Calculates Spearman's Rho for each across all genes for a given term
         return [stats.spearmanr(ge_mat[:, ge_mat.shape[1]-1], ge_mat[:, r])[0]
@@ -374,8 +374,8 @@ class NsabaAnalysis(object):
                 print "Using NIH described genes only; Entrez ID sample size now %d" % (len(sam_ids))
 
         # Fetching GE/NS activation matrix
-        ge_mat = self.no.make_ge_ns_mat(term, sam_ids).T[:-1]
-        term_act_vector = self.no.make_ge_ns_mat(term, sam_ids).T[-1:][0]
+        ge_mat = self.no.matrix_builder([term], sam_ids).T[:-1]
+        term_act_vector = self.no.matrix_builder([term], sam_ids).T[-1:][0]
 
         mask = self._split_mask(term_act_vector, method=split_method, **kwargs)
 
@@ -618,10 +618,10 @@ class NsabaAnalysis(object):
             alt_indices = random.randint(1, len(self.no.aba['probe_df']['entrez_id']), len(genes))
             alt_genes = self.no.aba['probe_df']['entrez_id'][alt_indices]
             for gene in genes:
-                ge_ns_mat = self.no.make_ge_ns_mat(term, gene)
+                ge_ns_mat = self.no.matrix_builder([term], [gene])
                 real_gene_output.append(np.corrcoef(ge_ns_mat[:, 0], np.log(ge_ns_mat[:, 1])))
             for gene in alt_genes:
-                ge_ns_mat = self.no.make_ge_ns_mat(term, gene)
+                ge_ns_mat = self.no.matrix_builder([term], [gene])
                 real_gene_output.append(np.corrcoef(ge_ns_mat[:, 0], np.log(ge_ns_mat[:, 1])))
             return real_gene_output, random_gene_output
 
@@ -629,10 +629,10 @@ class NsabaAnalysis(object):
             alt_indices = random.randint(1, len(self.no.aba['probe_df']['entrez_id']), len(genes))
             alt_genes = self.no.aba['probe_df']['entrez_id'][alt_indices]
             for gene in genes:
-                ge_ns_mat = self.no.make_ge_ns_mat(term, gene)
+                ge_ns_mat = self.no.matrix_builder([term], [gene])
                 real_gene_output.append(stats.spearmanr(ge_ns_mat[:, 0], ge_ns_mat[:, 1]))
             for gene in alt_genes:
-                ge_ns_mat = self.no.make_ge_ns_mat(term, gene)
+                ge_ns_mat = self.no.matrix_builder([term], [gene])
                 real_gene_output.append(stats.spearmanr(ge_ns_mat[:, 0], ge_ns_mat[:, 1]))
             return real_gene_output, random_gene_output
 
@@ -640,12 +640,12 @@ class NsabaAnalysis(object):
             alt_indices = random.randint(1, len(self.no.aba['probe_df']['entrez_id']), len(genes))
             alt_genes = self.no.aba['probe_df']['entrez_id'][alt_indices]
             for gene in genes:
-                ge_ns_mat = self.no.make_ge_ns_mat(term, gene)
+                ge_ns_mat = self.no.matrix_builder([term], [gene])
                 X = np.vstack([ge_ns_mat[:, 0], np.ones(len(ge_ns_mat[:, 0]))]).T
                 m, c = np.linalg.lstsq(X, np.log(ge_ns_mat[:, 1]))[0]
                 real_gene_output.append(m, c)
             for gene in alt_genes:
-                ge_ns_mat = self.no.make_ge_ns_mat(term, gene)
+                ge_ns_mat = self.no.matrix_builder([term], [gene])
                 X = np.vstack([ge_ns_mat[:, 0], np.ones(len(ge_ns_mat[:, 0]))]).T
                 m, c = np.linalg.lstsq(X, np.log(ge_ns_mat[:, 1]))[0]
                 random_gene_output.append(m, c)

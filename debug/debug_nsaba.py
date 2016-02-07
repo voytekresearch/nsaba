@@ -25,7 +25,7 @@ if __name__ == '__main__':
     # A.get_ns_act(term, thresh=.3, k=20, search_radii=3)
     #
     # Make matrix combining activation and gene expression vectors
-    # print A.make_ge_ns_mat(term, [733, 33, 88])
+    # print A.matrix_builder(term, [733, 33, 88])
 
     # Coordinate to gene expression
     A.coords_to_ge([[10, 20, 30]], [733, 33, 88], search_radii=20)

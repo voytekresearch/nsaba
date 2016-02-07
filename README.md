@@ -28,7 +28,7 @@ Save the decompressed output of this file to somewhere you will remember (/Users
     
     att.get_aba_ge(entrez_ids)
     att.get_ns_act(my_term, thresh=0, method='knn', k=15)
-    analysis_matrix = att.make_ge_ns_mat(my_term, entrez_ids)
+    analysis_matrix = att.matrix_builder(my_term, entrez_ids)
     
     # Run Science
     

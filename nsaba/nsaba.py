@@ -244,7 +244,7 @@ class Nsaba(NsabaBase):
             if isinstance(entrez_ids, str):
                 raise TypeError("Invalid parameter form; please contain entrez ids in iterable container")
 
-    def est_aba_ge(self, entrez_ids, coords=None, **kwargs):
+    def estimate_aba_ge(self, entrez_ids, coords=None, **kwargs):
         """
         Retrieves, estimates and stores gene expression coefficients in ABA dictionary based on a
         a passed list of NIH Entrez IDs.
@@ -325,7 +325,7 @@ class Nsaba(NsabaBase):
             raise ValueError("Invalid parameter form: entrez_ids should be in a 2-tuple")
         self._check_entrez_struct(entrez_ids)
 
-        self.est_aba_ge(entrez_ids, coords=coords, **kwargs)
+        self.estimate_aba_ge(entrez_ids, coords=coords, **kwargs)
 
         ei1, ei2 = entrez_ids
 
@@ -349,7 +349,6 @@ class Nsaba(NsabaBase):
         pickle.dump(self.ge, open(os.path.join(output_dir, pkl_file), 'wb'))
         print "%s successfully created" % pkl_file
 
-    @preprint('This may take a minute or two ...')
     def load_ge_pickle(self, pkl_file="Nsaba_ABA_ge.pkl", path='.'):
         """
         Loads pickle named by 'pkl_file' in directory 'output_dir' into Nsaba.ge.
@@ -591,7 +590,7 @@ class Nsaba(NsabaBase):
             term_ids_act.rename(columns={'pmid': 'id'}, inplace=True)
             return ns_coord_tree, term_coords.merge(term_ids_act)
 
-    def est_ns_act(self, term, coords=None, **kwargs):
+    def estimate_ns_act(self, term, coords=None, **kwargs):
         """Generates NS activation vector about ABA MNI coordinates; timed at 26.1 s"""
         if not self.is_term(term):
             raise ValueError("'%s' is not a registered term." % term)
@@ -620,21 +619,42 @@ class Nsaba(NsabaBase):
 
         self.term[term]['act'] = self.term[term]['classifer'].predict(coords.data)
 
-    def make_ge_ns_mat(self, ns_term, entrez_ids):
-        self._check_entrez_struct(entrez_ids)
-
-        if ns_term in self.term and all([key in self.ge for key in entrez_ids]):
-            ge_ns_mat = []
-            act_vec_len = len(self.term[ns_term]['act'])
-            for entrez_id in entrez_ids:
-                if len(self.ge[entrez_id]['GE']) == act_vec_len:
-                    ge_ns_mat.append(self.ge[entrez_id]['GE'])
-                else:
-                    raise ValueError("Size mismatch between ge[%d] and term[%s]['act']"
-                                     % (entrez_id, ns_term))
-            ge_ns_mat.append(self.term[ns_term]['act'])
-            return np.vstack(ge_ns_mat).T
+    def matrix_builder(self, ns_terms=None, entrez_ids=None):
+        if entrez_ids is None:
+            entrez_ids = []
         else:
-            raise ValueError("Either term['%s'] or one or more Entrez ID keys does not exist in ge; "
-                             "please check arguments" % ns_term)
+            self._check_entrez_struct(entrez_ids)
+            if not all([key in self.ge for key in entrez_ids]):
+                raise ValueError()
 
+        if ns_terms is not None:
+            if not all([term in self.term for term in ns_terms]):
+                raise ValueError()
+        else:
+            ns_terms = []
+
+        if not entrez_ids == []:
+            vec_len = len(self.ge[entrez_ids[0]]['GE'])
+        elif not ns_terms == []:
+            vec_len =  len(self.term[ns_terms[0]]['act'])
+        else:
+            raise ValueError("ns_terms and entrez_ids parameters both 'None'; "
+                             "at least one be set explicitly.")
+
+        matrix = []
+        for entrez_id in entrez_ids:
+            if len(self.ge[entrez_id]['GE']) == vec_len:
+                matrix.append(self.ge[entrez_id]['GE'])
+            else:
+                raise ValueError("Gene expression vector for '%s' size mismatched "
+                                 "with base vector. Please ensure that all vectors "
+                                 "corresponding to passed Entrez IDs are the same size." % str(entrez_id))
+        for term in ns_terms:
+            if len(self.term[term]['act']) == vec_len:
+                matrix.append(self.term[term]['act'])
+            else:
+                raise ValueError("Term activation vector for '%s' size mismatched "
+                                 "with base vector. Please ensure that all vectors "
+                                 "corresponding to passed Entrez IDs are the same size." % term)
+
+        return np.array(matrix).T
