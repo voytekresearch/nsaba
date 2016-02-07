@@ -49,7 +49,8 @@ class NsabaVisualizer(object):
 
                 ax.scatter(x, y, z, c=colors, alpha=alpha)
             else:
-                print 'Gene '+str(e) + ' has not been initialized. Use self.no.get_aba_ge([' + str(e) + '])'
+                raise ValueError("Gene %s has not been initialized. "
+                                 "Use self.no.get_aba_ge([%s])" % str(e))
         ax.set_title('Gene Expression of gene ID ' + str(gene))
 
     def visualize_ns(self, term, no_ids=10, alpha=0.2):
@@ -102,7 +103,7 @@ class NsabaVisualizer(object):
             ax.scatter(xvals, yvals, zvals, c=colors, alpha=alpha)
             ax.set_title('Heat map of ' + str(term))
         else:
-            print 'Term '+term + ' has not been initialized. Use self.no.get_ns_act(' + term + ')'
+            raise ValueError("Term '%s' has not been initialized. Use get_ns_act('%s')" % term)
 
     @not_operational
     def visualize_ns_old(self, term, points=200):
@@ -129,7 +130,8 @@ class NsabaVisualizer(object):
             y = self.no._ns['mni_coords'].data[inds_of_real_points_with_no_fucking_missing_study_ids, 1]
             z = self.no._ns['mni_coords'].data[inds_of_real_points_with_no_fucking_missing_study_ids, 2]
         else:
-            print 'Term '+term + ' has not been initialized. Use self.no.get_ns_act(' + term + ',thresh = 0.01)'
+            raise ValueError('Term '+term + ' has not been initialized. '
+                                            'Use get_ns_act(' + term + ')')
         ax.scatter(x, y, z, c=colors, alpha=0.4)
         ax.set_title('Estimation of ' + term)
 
@@ -170,12 +172,12 @@ class NsabaVisualizer(object):
         for g in gene:
             if g in self.no.ge:
                 if term in self.no.term:
-                    ge_ns_mat = self.no.make_ge_ns_mat(term, gene)
+                    ge_ns_mat = self.no.matrix_builder([term], gene)
                     if only_term:
                         if ge_ns_mat.shape[0] > 900:  # check this num later
                             print 'reinitializing ' + term + ' for hacky plotting method'
                             self.no.get_ns_act(term, thresh=0, method='knn')
-                            ge_ns_mat = self.no.make_ge_ns_mat(term, gene)
+                            ge_ns_mat = self.no.matrix_builder([term], gene)
                     fig = plt.figure()
                     ax = fig.add_subplot(111)
                     if logy:
@@ -203,9 +205,10 @@ class NsabaVisualizer(object):
 
                     return correlation, [m, c]
                 else:
-                    raise ValueError('Term '+term + ' has not been initialized. Use self.no.get_ns_act(' + term + ',thresh = 0.01)')
+                    raise ValueError("Term '%s' has not been initialized. Use get_ns_act('%s')" % term)
             else:
-                raise ValueError('Gene '+str(g) + ' has not been initialized. Use self.no.get_aba_ge([' + str(g) + '])')
+                raise ValueError("Gene %s has not been initialized. "
+                                 "Use self.no.get_aba_ge([%s])" % str(g))
 
     def lstsq_ns_ns(self, term1, term2, logy=False, logx=False):
         """
@@ -260,9 +263,9 @@ class NsabaVisualizer(object):
                 ax.set_ylabel(term2)
                 return correlation, [m, c]
             else:
-                raise ValueError('Term '+term2 + ' has not been initialized. Use self.no.get_ns_act(' + term2 + ',thresh = -1)')
+                raise ValueError("Term '%s' has not been initialized. Use get_ns_act('%s')" % term2)
         else:
-            raise ValueError('Term '+term1 + ' has not been initialized. Use self.no.get_ns_act(' + term1 + ',thresh = -1)')
+            raise ValueError("Term '%s' has not been initialized. Use get_ns_act('%s')" % term1)
 
     def lstsq_ge_ge(self, gene1, gene2):
         """
@@ -298,10 +301,11 @@ class NsabaVisualizer(object):
 
         for gene in genes:
             if gene not in self.no.ge:
-                raise ValueError('Gene '+str(g) + ' has not been initialized. Use self.no.get_aba_ge([' + str(g) + '])')
+                raise ValueError("Gene %s has not been initialized. "
+                                 "Use self.no.get_aba_ge([%s])" % str(gene))
 
         if len(self.no.ge[genes[0]]['GE']) != len(self.no.ge[genes[1]]['GE']):
-            raise ValueError("'GE' size mismatched rerun Nsaba.est_aba_ge() again.")
+            raise ValueError("'GE' size mismatched rerun Nsaba.estimate_aba_ge() again.")
 
         g0 = self.no.ge[genes[0]]['GE']
         g1 = self.no.ge[genes[1]]['GE']
