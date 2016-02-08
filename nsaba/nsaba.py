@@ -253,6 +253,13 @@ class Nsaba(NsabaBase):
         ----------
         entrez_ids: List-like
             list-like structure containing NIH Entrez IDs.
+
+        kwargs : dict, optional
+            OPTIONS:
+                'knn_args' : dict
+                    SKLearn KNeighborsRegressor() optional arguments.
+                    See: http://scikit-learn.org/stable/modules/generated/sklearn.neighbors.KNeighborsRegressor.html
+                    for default arguments.
         """
 
         self._check_entrez_struct(entrez_ids)
@@ -312,6 +319,13 @@ class Nsaba(NsabaBase):
         ----------
         entrez_ids: (tuple-like) 2
             Entrez IDs of genes whose expression ratio is to be calculated.
+
+        kwargs : dict, optional
+            OPTIONS:
+                'knn_args' : dict
+                    SKLearn KNeighborsRegressor() optional arguments.
+                    See: http://scikit-learn.org/stable/modules/generated/sklearn.neighbors.KNeighborsRegressor.html
+                    for default arguments.
 
         Returns
         -------
@@ -591,7 +605,27 @@ class Nsaba(NsabaBase):
             return ns_coord_tree, term_coords.merge(term_ids_act)
 
     def estimate_ns_act(self, term, coords=None, **kwargs):
-        """Generates NS activation vector about ABA MNI coordinates; timed at 26.1 s"""
+        """
+        Uses KNN to estimate Neurosynth term activation (tf-idf) at
+        specified coordinates. If no coordinates are passed, ABA sampled
+        locations in corresponding NsabaBase are used.
+
+        Parameters
+        ----------
+        term : str
+            NS term whose activation is to be estimated
+
+        coords : np.array [int], optional
+            Coordinates where NS term activation is to be estimated.
+
+        kwargs : dict, optional
+            OPTIONS:
+                'knn_args' : dict
+                    SKLearn KNeighborsRegressor() optional arguments.
+                    See: http://scikit-learn.org/stable/modules/generated/sklearn.neighbors.KNeighborsRegressor.html
+                    for default arguments.
+
+        """
         if not self.is_term(term):
             raise ValueError("'%s' is not a registered term." % term)
 
@@ -620,6 +654,29 @@ class Nsaba(NsabaBase):
         self.term[term]['act'] = self.term[term]['classifer'].predict(coords.data)
 
     def matrix_builder(self, ns_terms=None, entrez_ids=None):
+        """
+        Generates a np.array() matrix of pre-estimated term actirvations and gene expression
+        coefficients.
+
+        NOTE: All coefficient vectors must be same size; otherwise ValueError is raised.
+
+        Parameters
+        ----------
+        ns_terms : list-like, optional
+            List of NS terms whose activations are inserted in the returned matrix.
+
+        entrez_ids : list-like, optional
+            List of Entrez IDs whose corresponding gene expression coefficients
+            are inserted in the returned matrix.
+
+        Returns
+        -------
+        np.array( [entrez_ids + ns_terms x vec_len]):
+            Matrix of term activations and/or gene expression coefficients; coefficient
+            vectors are stacked horizontally as column vectors.
+
+
+        """
         if entrez_ids is None:
             entrez_ids = []
         else:
