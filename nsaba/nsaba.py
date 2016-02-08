@@ -379,6 +379,37 @@ class Nsaba(NsabaBase):
         self.ge = pickle.load(open(os.path.join(path, pkl_file), 'rb'))
         print "'ge' dictionary successfully loaded"
 
+    def pickle_ns(self, pkl_file="Nsaba_NS_act.pkl", output_dir='.'):
+        """
+        Stores Nsaba.term as pickle named by 'pkl_file' in directory 'output_dir'.
+
+        Parameters
+        ----------
+        pkl_file: string, optional
+            Name of pickle file.
+        output_dir: string, optional
+            Name of directory the pickle is to be written to;
+            '/' automatically added via os.path.join.
+        """
+
+        pickle.dump(self.term, open(os.path.join(output_dir, pkl_file), 'wb'))
+        print "%s successfully created" % pkl_file
+    def load_ns_pickle(self, pkl_file="Nsaba_NS_act.pkl", path='.'):
+        """
+        Loads pickle named by 'pkl_file' in directory 'output_dir' into Nsaba.term.
+
+        Parameters
+        ----------
+        pkl_file: string, optional
+            Name of pickle file.
+        path: string, optional
+            Path to directory the pickle is written to;
+            '/' automatically added via os.path.join.
+        """
+
+        self.term = pickle.load(open(os.path.join(path, pkl_file), 'rb'))
+        print "term dictionary successfully loaded"
+
     def is_gene(self, gene):
         """
         Parameters
