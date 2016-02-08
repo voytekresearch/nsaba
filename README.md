@@ -32,11 +32,11 @@ Declaring Entrez IDs for genes of interest: in this case [1813](http://www.ncbi.
     att = Nsaba()
 
 
-Generating gene expression and term TF-IDF statistics.
+Generating gene expression and term tf-idf statistics.
 
-    att.get_aba_ge(entrez_ids)
-    att.get_ns_act(my_term, thresh=0, method='knn', k=15)
-    analysis_matrix = att.make_ge_ns_mat(my_term, entrez_ids)
+    att.estimate_aba_ge(entrez_ids)
+    att.estimate_ns_act(my_term, knn_args={'n_neighbors':10})
+    analysis_matrix = att.matrix_builder(my_term, entrez_ids)
     
 Nsaba comes with an analysis module to aid with large-scale significance testing and information
 retrieval.
@@ -46,7 +46,7 @@ retrieval.
     ....
     
     att_stats  = na.NsabaAnalysis(att)
-    tttest_metrics = att_stats.t_test_multi('reward',quant=90)
+    tttest_metrics = att_stats.term_ge_ttest_multi('reward',quant=90)
     att_stats.fetch_gene_descriptions(tttest_metrics)
     
 See for this [notebook](https://github.com/voytekresearch/nsaba/blob/master/notebooks/demos/Nsaba_Demonstration.ipynb) for a full demonstration.    
@@ -59,4 +59,3 @@ See for this [notebook](https://github.com/voytekresearch/nsaba/blob/master/note
  * Multi-brain analysis.
  
  * Full suite of demonstration and example notebooks.
-
