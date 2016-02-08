@@ -267,8 +267,7 @@ class Nsaba(NsabaBase):
         for entrez_id in entrez_ids:
             # Fetch probe IDs for Entrez ID
             probe_ids = self._aba['probe_df'].loc[self._aba['probe_df']['entrez_id']
-                                                 == entrez_id]['probe_id'].tolist()
-
+                                                  == entrez_id]['probe_id'].tolist()
             if len(probe_ids) == 0:
                 print 'Entrez ID: %s not registered with ABA database' % entrez_id
                 continue
@@ -724,7 +723,7 @@ class Nsaba(NsabaBase):
         if not entrez_ids == []:
             vec_len = len(self.ge[entrez_ids[0]]['GE'])
         elif not ns_terms == []:
-            vec_len =  len(self.term[ns_terms[0]]['act'])
+            vec_len = len(self.term[ns_terms[0]]['act'])
         else:
             raise ValueError("ns_terms and entrez_ids parameters both 'None'; "
                              "at least one be set explicitly.")
