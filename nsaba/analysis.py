@@ -447,8 +447,8 @@ class NsabaAnalysis(object):
             additional gene description information.
 
         """
-        if 'printer' not in kwargs:
-            kwargs['printer'] = True
+        if 'verbose' not in kwargs:
+            kwargs['printer'] = False
         if 'nih_dl' not in kwargs:
             kwargs['nih_dl'] = False
 
@@ -498,7 +498,7 @@ class NsabaAnalysis(object):
                         gene_dat = get_local_gene_info(kwargs['csv_path'], [top_ids[x]])
                         gene_name = gene_dat[0].name
                         gene_description = gene_dat[0].description
-                    top_genes.append((int(top_ids[x]), top_rs[x], gene_name, gene_description))
+                    top_genes.append((top_ids[x].astype(int64), top_rs[x], gene_name, gene_description))
                 except IndexError:
                     continue
 
@@ -590,7 +590,7 @@ class NsabaAnalysis(object):
 
         top_genes = self.fetch_gene_descriptions(ttest_metrics, nih_fetch_num=no_genes, printme=False)
         eids = [int(i[0]) for i in top_genes]
-        myfig = self.effect_size_distr(ttest_metrics, genes_of_interest=eids[0:no_genes], return_fig=True)
+        myfig = self.cohen_d_distr(ttest_metrics, genes_of_interest=eids[0:no_genes], return_fig=True)
         plt.savefig(fname+'.png')
 
         with open(fname+'.csv', 'wb') as csvfile:
