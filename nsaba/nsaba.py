@@ -11,11 +11,12 @@ import pickle
 import os
 import itertools
 import collections
+import warnings
 import numpy as np
 import pandas as pd
 from scipy import spatial
 
-from sklearn.neighbors import KNeighborsRegressor
+from sklearn.neighbors import RadiusNeighborsRegressor
 from nsabatools import not_operational, preprint
 
 
@@ -256,9 +257,9 @@ class Nsaba(NsabaBase):
 
         kwargs : dict, optional
             OPTIONS:
-                'knn_args' : dict
-                    SKLearn KNeighborsRegressor() optional arguments.
-                    See: http://scikit-learn.org/stable/modules/generated/sklearn.neighbors.KNeighborsRegressor.html
+                'rnn_args' : dict
+                    SKLearn RadiusNeighborsRegressor() optional arguments.
+                    http://scikit-learn.org/stable/modules/generated/sklearn.neighbors.RadiusNeighborsRegressor.html
                     for default arguments.
         """
 
@@ -288,10 +289,12 @@ class Nsaba(NsabaBase):
 
             # Estimate gene expression at custom coordinates
             else:
-                if 'knn_args' in kwargs:
-                    self.ge[entrez_id]['classifer'] = KNeighborsRegressor(**kwargs['knn_args'])
+                if 'rnn_args' in kwargs:
+                    if 'radius' not in kwargs['rnn_args']:
+                        kwargs['rnn_args']['radius'] = 5
+                    self.ge[entrez_id]['classifer'] = RadiusNeighborsRegressor(**kwargs['rnn_args'])
                 else:
-                    self.ge[entrez_id]['classifer'] = KNeighborsRegressor()
+                    self.ge[entrez_id]['classifer'] = RadiusNeighborsRegressor(radius=5)
 
                 X = self._aba['mni_coords']
                 y = ge_vec
@@ -306,7 +309,9 @@ class Nsaba(NsabaBase):
                 else:
                     self.ge[entrez_id]['coord_type'] = 'Custom'
 
-                self.ge[entrez_id]["GE"] = self.ge[entrez_id]['classifer'].predict(coords)
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    self.ge[entrez_id]["GE"] = self.ge[entrez_id]['classifer'].predict(coords)
 
     def ge_ratio(self, entrez_ids, coords=None, **kwargs):
         """
@@ -322,9 +327,9 @@ class Nsaba(NsabaBase):
 
         kwargs : dict, optional
             OPTIONS:
-                'knn_args' : dict
-                    SKLearn KNeighborsRegressor() optional arguments.
-                    See: http://scikit-learn.org/stable/modules/generated/sklearn.neighbors.KNeighborsRegressor.html
+                'rnn_args' : dict
+                    SKLearn RadiusNeighborsRegressor() optional arguments.
+                    http://scikit-learn.org/stable/modules/generated/sklearn.neighbors.RadiusNeighborsRegressor.html
                     for default arguments.
 
         Returns
@@ -619,10 +624,9 @@ class Nsaba(NsabaBase):
             Coordinates where NS term activation is to be estimated.
 
         kwargs : dict, optional
-            OPTIONS:
-                'knn_args' : dict
-                    SKLearn KNeighborsRegressor() optional arguments.
-                    See: http://scikit-learn.org/stable/modules/generated/sklearn.neighbors.KNeighborsRegressor.html
+                'rnn_args' : dict
+                    SKLearn RadiusNeighborsRegressor() optional arguments.
+                    http://scikit-learn.org/stable/modules/generated/sklearn.neighbors.RadiusNeighborsRegressor.html
                     for default arguments.
 
         """
@@ -641,17 +645,21 @@ class Nsaba(NsabaBase):
 
         ns_coord_tree, ns_coord_act_df = self._term_to_coords(term, 0)
 
-        if 'knn_args' in kwargs:
-            self.term[term]['classifer'] = KNeighborsRegressor(**kwargs['knn_args'])
+        if 'rnn_args' in kwargs:
+            if 'radius' not in kwargs['rnn_args']:
+                kwargs['rnn_args']['radius'] = 5
+            self.term[term]['classifer'] = RadiusNeighborsRegressor(**kwargs['rnn_args'])
         else:
-            self.term[term]['classifer'] = KNeighborsRegressor()
+            self.term[term]['classifer'] = RadiusNeighborsRegressor(radius=5)
 
         X = ns_coord_tree.data
         y = ns_coord_act_df[term].as_matrix()
 
         self.term[term]['classifer'].fit(X,y)
 
-        self.term[term]['act'] = self.term[term]['classifer'].predict(coords.data)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            self.term[term]['act'] = self.term[term]['classifer'].predict(coords.data)
 
     def matrix_builder(self, ns_terms=None, entrez_ids=None):
         """

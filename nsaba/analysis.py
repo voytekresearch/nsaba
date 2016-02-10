@@ -42,6 +42,7 @@ class NsabaAnalysis(object):
             raise ValueError("NsabaAnalysis() parameter not a Nsaba instance")
 
         self.gene_rec = collections.namedtuple("gene_rec", "entrez cohen_d p_value")
+        self.default_quant = 85
         print "To use inline plotting functionality in Jupyter, '%matplotlib inline' must be enabled"
 
     def _mask_check(self, mask, method):
@@ -93,8 +94,7 @@ class NsabaAnalysis(object):
         """
         if method == 'quant':
             if 'quant' not in kwargs:
-                kwargs['quant'] = 85
-                # NOTE!!: This value ^ has a dependence in term_ge_ttest_multi
+                kwargs['quant'] = self.default_quant
             thres = np.percentile(term_vec, kwargs['quant'])
             mask = np.array([True if coeff > thres else False for coeff in term_vec])
             self._mask_check(mask, method)
@@ -385,8 +385,7 @@ class NsabaAnalysis(object):
             if 'quant' in kwargs:
                 ttest_metrics['quant'] = kwargs['quant']
             else:
-                ttest_metrics['quant'] = 85
-                # NOTE!!! This dependent on _mask_split()'s default quant splitting value
+                ttest_metrics['quant'] = self.default_quant
 
         gene_stats = []
         for eid, ge in zip(sam_ids, ge_mat):
