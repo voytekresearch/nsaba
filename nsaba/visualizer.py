@@ -49,7 +49,8 @@ class NsabaVisualizer(object):
 
                 ax.scatter(x, y, z, c=colors, alpha=alpha)
             else:
-                raise ValueError("Gene %s has not been initialized. Use self.no.get_aba_ge([%s])" % (str(e), str(e)))
+                raise ValueError("Gene %s has not been initialized. "
+                                 "Use self.no.get_aba_ge([%s])" % str(e))
         ax.set_title('Gene Expression of gene ID ' + str(gene))
 
     def visualize_ns(self, term, no_ids=10, alpha=0.2):
@@ -102,7 +103,7 @@ class NsabaVisualizer(object):
             ax.scatter(xvals, yvals, zvals, c=colors, alpha=alpha)
             ax.set_title('Heat map of ' + str(term))
         else:
-            raise ValueError("Term '%s' has not been initialized. Use get_ns_act('%s')" % (term,term))
+            raise ValueError("Term '%s' has not been initialized. Use get_ns_act('%s')" % term)
 
     @not_operational
     def visualize_ns_old(self, term, points=200):
@@ -129,18 +130,16 @@ class NsabaVisualizer(object):
             y = self.no._ns['mni_coords'].data[inds_of_real_points_with_no_fucking_missing_study_ids, 1]
             z = self.no._ns['mni_coords'].data[inds_of_real_points_with_no_fucking_missing_study_ids, 2]
         else:
-            raise ValueError('Term '+term + ' has not been initialized. Use get_ns_act(' + term + ')')
+            raise ValueError('Term '+term + ' has not been initialized. '
+                                            'Use get_ns_act(' + term + ')')
         ax.scatter(x, y, z, c=colors, alpha=0.4)
         ax.set_title('Estimation of ' + term)
 
+    @not_operational
     def lstsq_ge_ns(self, gene, term, logy=False, logx=False):
-        """
-        Calls lstsq_ns_ge
-        """
         self.lstsq_ns_ge(self, term, gene, logy=logy, logx=logx)
 
-
-    def lstsq_ns_ge(self, term, gene, logy=False, logx=False, only_term=False, verbose=False):
+    def lstsq_ns_ge(self, term, gene, logy=False, logx=False, only_term=False):
         """
         Generates a linear regression plot for gene expression to
         term activation.
@@ -193,22 +192,25 @@ class NsabaVisualizer(object):
                     X = np.vstack([ge_ns_mat[:, 0], np.ones(len(ge_ns_mat[:, 0]))]).T
                     m, c = np.linalg.lstsq(X, ge_ns_mat[:, 1])[0]
 
+                    # print 'Correlation between ' + term + ' and gene number ' + str(gene)
+                    # print correlation
+                    # print 'Linear regression between ' + term + ' and gene number ' + str(gene)
+                    #       +' Slope =' + str(m) + ' y intercept = '+ str(c)
+
                     ax.plot(ge_ns_mat[:, 0], ge_ns_mat[:, 1], '.')
                     ax.plot([min(ge_ns_mat[:, 0]), max(ge_ns_mat[:, 0])], [m*min(ge_ns_mat[:, 0])+c,
                                                                            m*max(ge_ns_mat[:, 0])+c], 'r')
                     ax.set_xlabel(str(gene))
                     ax.set_ylabel(term)
-                    if verbose:
-                        print 'Correlation: r=' + str(correlation[0])+' p=' + str(correlation[1]) + \
-                              '\n Linear regression coefficients: ' + 'm=' + str(m) + ' c=' + str(c)
 
                     return correlation, [m, c]
                 else:
-                    raise ValueError("Term '%s' has not been initialized. Use get_ns_act('%s')" % (term, term))
+                    raise ValueError("Term '%s' has not been initialized. Use get_ns_act('%s')" % term)
             else:
-                raise ValueError("Gene %s has not been initialized. Use self.no.get_aba_ge([%s])" % (str(g),str(g)))
+                raise ValueError("Gene %s has not been initialized. "
+                                 "Use self.no.get_aba_ge([%s])" % str(g))
 
-    def lstsq_ns_ns(self, term1, term2, logy=False, logx=False, verbose=False):
+    def lstsq_ns_ns(self, term1, term2, logy=False, logx=False):
         """
         Generates a linear regression plot for term activation to
         term activation.
@@ -254,23 +256,18 @@ class NsabaVisualizer(object):
                 if logx:
                     ax.set_xscale('log')
                 ax.plot(self.no.term[term1]['act'], self.no.term[term2]['act'], '.')
-
-                #linear regression line
                 ax.plot([min(self.no.term[term1]['act']), max(self.no.term[term1]['act'])],
                         [m*min(self.no.term[term2]['act'])+c,
                          m*max(self.no.term[term2]['act'])+c], 'r')
                 ax.set_xlabel(term1)
                 ax.set_ylabel(term2)
-                if verbose:
-                    print 'Correlation: r=' + str(correlation[0])+' p=' + str(correlation[1]) + \
-                                '\n Linear regression coefficients: ' + 'm=' + str(m) + ' c=' + str(c)
                 return correlation, [m, c]
             else:
-                raise ValueError("Term '%s' has not been initialized. Use get_ns_act('%s')" % (term2, term2))
+                raise ValueError("Term '%s' has not been initialized. Use get_ns_act('%s')" % term2)
         else:
-            raise ValueError("Term '%s' has not been initialized. Use get_ns_act('%s')" % (term1, term1))
+            raise ValueError("Term '%s' has not been initialized. Use get_ns_act('%s')" % term1)
 
-    def lstsq_ge_ge(self, gene1, gene2, verbose=False):
+    def lstsq_ge_ge(self, gene1, gene2):
         """
         Generates a linear regression plot for gene expression
         to gene expression.
@@ -304,7 +301,8 @@ class NsabaVisualizer(object):
 
         for gene in genes:
             if gene not in self.no.ge:
-                raise ValueError("Gene %s has not been initialized. Use self.no.get_aba_ge([%s])" % (str(gene), str(gene)))
+                raise ValueError("Gene %s has not been initialized. "
+                                 "Use self.no.get_aba_ge([%s])" % str(gene))
 
         if len(self.no.ge[genes[0]]["mean"]['GE']) != len(self.no.ge[genes[1]]["mean"]['GE']):
             raise ValueError("'GE' size mismatched rerun Nsaba.estimate_aba_ge() again.")
@@ -325,7 +323,4 @@ class NsabaVisualizer(object):
                  [m*min(g1)+c, m*max(g1)+c], 'r')
         ax.set_xlabel(genes[0])
         ax.set_ylabel(genes[1])
-        if verbose:
-            print 'Correlation: r=' + str(correlation[0])+' p=' + str(correlation[1]) + \
-                  '\n Linear regression coefficients: ' + 'm=' + str(m) + ' c=' +str(c)
         return correlation, [m, c]

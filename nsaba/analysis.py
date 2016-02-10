@@ -6,7 +6,7 @@ Author: Simon Haxby & Torben Noto
 
 from nsaba import Nsaba
 from nsabatools import preprint, not_operational
-from geneinfo import load_gene_file, get_local_gene_info, scrape_gene_info
+from geneinfo import load_gene_file, get_gene_info, gene_info
 
 import random
 import collections
@@ -134,7 +134,7 @@ class NsabaAnalysis(object):
         control_grp = np.array(list(diff))
         return control_grp, functional_grp
 
-    def term_ge_ttest(self, term, gene, split_method='quant', graphops='density', verbose=False, **kwargs):
+    def term_ge_ttest(self, term, gene, split_method='quant', graphops='density', **kwargs):
         """
         Performs gene expression t-test between coordinates in control and functional
         network based on term activation, and generates associated plot.
@@ -185,11 +185,9 @@ class NsabaAnalysis(object):
                 cont_grp = np.log(cont_grp)
 
         # T-Test
-        if verbose:
-            print "t-value: %.4f \np-value: %.3E" % stats.ttest_ind(cont_grp, funct_grp) + '\n'
-            print "Effect size: %.4f" % cohen_d(cont_grp, funct_grp, len(cont_grp), len(funct_grp)) + '\n'
-            print "Control/Functional Split: %d/%d\n" % (len(mask)-sum(mask), sum(mask))
-
+        print "t-value: %.4f \np-value: %.3E" % stats.ttest_ind(cont_grp, funct_grp)
+        print "Effect size: %.4f" % cohen_d(cont_grp, funct_grp, len(cont_grp), len(funct_grp))
+        print "Control/Functional Split: %d/%d\n" % (len(mask)-sum(mask), sum(mask))
         # Histogram/KDE Plots
         if graphops == 'density':
             ax = plt.axes()
@@ -467,8 +465,8 @@ class NsabaAnalysis(object):
             additional gene description information.
 
         """
-        if 'verbose' not in kwargs:
-            kwargs['printer'] = False
+        if 'printer' not in kwargs:
+            kwargs['printer'] = True
         if 'nih_dl' not in kwargs:
             kwargs['nih_dl'] = False
 
@@ -485,9 +483,9 @@ class NsabaAnalysis(object):
             for rec in metrics['results'][:nih_fetch_num]:
                 try:
                     if kwargs['nih_dl']:
-                        gene_name, gene_description = scrape_gene_info(str(rec.entrez))
+                        gene_name, gene_description = gene_info(str(rec.entrez))
                     else:
-                        gene_dat = get_local_gene_info(kwargs['csv_path'], [rec.entrez])
+                        gene_dat = get_gene_info(kwargs['csv_path'], [rec.entrez])
                         gene_name = gene_dat[0].name
                         gene_description = gene_dat[0].description
                     top_genes.append((rec.entrez, rec.cohen_d, rec.p_value, gene_name, gene_description))
@@ -513,12 +511,12 @@ class NsabaAnalysis(object):
             for x in xrange(len(top_ids)):
                 try:
                     if kwargs['nih_dl']:
-                        gene_name, gene_description = scrape_gene_info(str(top_ids[x]))
+                        gene_name, gene_description = gene_info(str(top_ids[x]))
                     else:
-                        gene_dat = get_local_gene_info(kwargs['csv_path'], [top_ids[x]])
+                        gene_dat = get_gene_info(kwargs['csv_path'], [top_ids[x]])
                         gene_name = gene_dat[0].name
                         gene_description = gene_dat[0].description
-                    top_genes.append((top_ids[x].astype(int64), top_rs[x], gene_name, gene_description))
+                    top_genes.append((int(top_ids[x]), top_rs[x], gene_name, gene_description))
                 except IndexError:
                     continue
 
@@ -610,7 +608,7 @@ class NsabaAnalysis(object):
 
         top_genes = self.fetch_gene_descriptions(ttest_metrics, nih_fetch_num=no_genes, printme=False)
         eids = [int(i[0]) for i in top_genes]
-        myfig = self.cohen_d_distr(ttest_metrics, genes_of_interest=eids[0:no_genes], return_fig=True)
+        myfig = self.effect_size_distr(ttest_metrics, genes_of_interest=eids[0:no_genes], return_fig=True)
         plt.savefig(fname+'.png')
 
         with open(fname+'.csv', 'wb') as csvfile:
