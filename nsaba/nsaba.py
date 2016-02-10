@@ -11,11 +11,12 @@ import pickle
 import os
 import itertools
 import collections
+import warnings
 import numpy as np
 import pandas as pd
 from scipy import spatial
 
-from sklearn.neighbors import KNeighborsRegressor
+from sklearn.neighbors import RadiusNeighborsRegressor
 from nsabatools import not_operational, preprint
 
 
@@ -256,9 +257,9 @@ class Nsaba(NsabaBase):
 
         kwargs : dict, optional
             OPTIONS:
-                'knn_args' : dict
-                    SKLearn KNeighborsRegressor() optional arguments.
-                    See: http://scikit-learn.org/stable/modules/generated/sklearn.neighbors.KNeighborsRegressor.html
+                'rnn_args' : dict
+                    SKLearn RadiusNeighborsRegressor() optional arguments.
+                    http://scikit-learn.org/stable/modules/generated/sklearn.neighbors.RadiusNeighborsRegressor.html
                     for default arguments.
         """
 
@@ -275,28 +276,42 @@ class Nsaba(NsabaBase):
 
             # Return gene expression on given probes across sampled locations.
             ge_df = self._aba['exp_df'].loc[self._aba['exp_df']['probe_id'].isin(probe_ids)]
-            ge_mat = ge_df.as_matrix().astype(float)[:, 1:].T
+            ge_mat = ge_df.as_matrix().astype(float)[:, 1:]
 
             # Take average gene expression across probes at a given sampled location.
+            ge_vec = np.mean(ge_mat, axis=0)
 
-            ge_vec = np.mean(ge_mat, axis=1)
             self.ge[entrez_id] = {}
+            for probe in probe_ids:
+                self.ge[entrez_id][probe] = {}
+            self.ge[entrez_id]["mean"] = {}
 
             if coords is None:
-                self.ge[entrez_id]['GE'] = ge_vec
+                for row, probe in enumerate(probe_ids):
+                    self.ge[entrez_id][probe]['GE'] = ge_mat[row]
+                self.ge[entrez_id]["mean"]['GE'] = ge_vec
                 self.ge[entrez_id]['coord_type'] = 'ABA'
 
             # Estimate gene expression at custom coordinates
             else:
-                if 'knn_args' in kwargs:
-                    self.ge[entrez_id]['classifer'] = KNeighborsRegressor(**kwargs['knn_args'])
+                if 'rnn_args' in kwargs:
+                    if 'radius' not in kwargs['rnn_args']:
+                        kwargs['rnn_args']['radius'] = 5
+                    for row, probe in enumerate(probe_ids):
+                        self.ge[entrez_id][probe]['classifer'] = RadiusNeighborsRegressor(**kwargs['rnn_args'])
+                    self.ge[entrez_id]["mean"]['classifer'] = RadiusNeighborsRegressor(**kwargs['rnn_args'])
                 else:
-                    self.ge[entrez_id]['classifer'] = KNeighborsRegressor()
+                    for row, probe in enumerate(probe_ids):
+                        self.ge[entrez_id][probe]['classifer'] = RadiusNeighborsRegressor(radius=5)
+                    self.ge[entrez_id]["mean"]['classifer'] = RadiusNeighborsRegressor(radius=5)
 
                 X = self._aba['mni_coords']
-                y = ge_vec
+                y_mean = ge_vec
 
-                self.ge[entrez_id]['classifer'].fit(X.data, y)
+                for row, probe in enumerate(probe_ids):
+                     self.ge[entrez_id][probe]['classifer'].fit(X.data, ge_mat[row])
+                self.ge[entrez_id]["mean"]['classifer'].fit(X.data, y_mean)
+
                 if 'store_coords' in kwargs:
                     if kwargs['store_coords']:
                         self.ge[entrez_id]['coords'] = coords
@@ -306,7 +321,11 @@ class Nsaba(NsabaBase):
                 else:
                     self.ge[entrez_id]['coord_type'] = 'Custom'
 
-                self.ge[entrez_id]["GE"] = self.ge[entrez_id]['classifer'].predict(coords)
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    for row, probe in enumerate(probe_ids):
+                        self.ge[entrez_id][probe]["GE"] = self.ge[entrez_id][probe]['classifer'].predict(coords)
+                        self.ge[entrez_id]["mean"]["GE"] = self.ge[entrez_id]["mean"]['classifer'].predict(coords)
 
     def ge_ratio(self, entrez_ids, coords=None, **kwargs):
         """
@@ -322,9 +341,9 @@ class Nsaba(NsabaBase):
 
         kwargs : dict, optional
             OPTIONS:
-                'knn_args' : dict
-                    SKLearn KNeighborsRegressor() optional arguments.
-                    See: http://scikit-learn.org/stable/modules/generated/sklearn.neighbors.KNeighborsRegressor.html
+                'rnn_args' : dict
+                    SKLearn RadiusNeighborsRegressor() optional arguments.
+                    http://scikit-learn.org/stable/modules/generated/sklearn.neighbors.RadiusNeighborsRegressor.html
                     for default arguments.
 
         Returns
@@ -343,7 +362,7 @@ class Nsaba(NsabaBase):
 
         ei1, ei2 = entrez_ids
 
-        ratio = self.ge[ei1]['GE']/self.ge[ei2]['GE']
+        ratio = self.ge[ei1]["mean"]['GE']/self.ge[ei2]["mean"]['GE']
 
         return ratio
 
@@ -619,10 +638,9 @@ class Nsaba(NsabaBase):
             Coordinates where NS term activation is to be estimated.
 
         kwargs : dict, optional
-            OPTIONS:
-                'knn_args' : dict
-                    SKLearn KNeighborsRegressor() optional arguments.
-                    See: http://scikit-learn.org/stable/modules/generated/sklearn.neighbors.KNeighborsRegressor.html
+                'rnn_args' : dict
+                    SKLearn RadiusNeighborsRegressor() optional arguments.
+                    http://scikit-learn.org/stable/modules/generated/sklearn.neighbors.RadiusNeighborsRegressor.html
                     for default arguments.
 
         """
@@ -641,17 +659,21 @@ class Nsaba(NsabaBase):
 
         ns_coord_tree, ns_coord_act_df = self._term_to_coords(term, 0)
 
-        if 'knn_args' in kwargs:
-            self.term[term]['classifer'] = KNeighborsRegressor(**kwargs['knn_args'])
+        if 'rnn_args' in kwargs:
+            if 'radius' not in kwargs['rnn_args']:
+                kwargs['rnn_args']['radius'] = 5
+            self.term[term]['classifer'] = RadiusNeighborsRegressor(**kwargs['rnn_args'])
         else:
-            self.term[term]['classifer'] = KNeighborsRegressor()
+            self.term[term]['classifer'] = RadiusNeighborsRegressor(radius=5)
 
         X = ns_coord_tree.data
         y = ns_coord_act_df[term].as_matrix()
 
         self.term[term]['classifer'].fit(X,y)
 
-        self.term[term]['act'] = self.term[term]['classifer'].predict(coords.data)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            self.term[term]['act'] = self.term[term]['classifer'].predict(coords.data)
 
     def matrix_builder(self, ns_terms=None, entrez_ids=None):
         """
@@ -691,7 +713,7 @@ class Nsaba(NsabaBase):
             ns_terms = []
 
         if not entrez_ids == []:
-            vec_len = len(self.ge[entrez_ids[0]]['GE'])
+            vec_len = len(self.ge[entrez_ids[0]]["mean"]['GE'])
         elif not ns_terms == []:
             vec_len =  len(self.term[ns_terms[0]]['act'])
         else:
@@ -700,8 +722,8 @@ class Nsaba(NsabaBase):
 
         matrix = []
         for entrez_id in entrez_ids:
-            if len(self.ge[entrez_id]['GE']) == vec_len:
-                matrix.append(self.ge[entrez_id]['GE'])
+            if len(self.ge[entrez_id]["mean"]['GE']) == vec_len:
+                matrix.append(self.ge[entrez_id]["mean"]['GE'])
             else:
                 raise ValueError("Gene expression vector for '%s' size mismatched "
                                  "with base vector. Please ensure that all vectors "

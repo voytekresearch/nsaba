@@ -37,7 +37,7 @@ class NsabaVisualizer(object):
             if e in self.no.ge:
                 fig = plt.figure()
                 ax = fig.add_subplot(111, projection='3d')
-                weights = self.no.ge[e]['GE']
+                weights = self.no.ge[e]["mean"]['GE']
                 colors = cm.jet(weights/max(weights))
                 color_map = cm.ScalarMappable(cmap=cm.jet)
                 color_map.set_array(weights)
@@ -176,7 +176,7 @@ class NsabaVisualizer(object):
                     if only_term:
                         if ge_ns_mat.shape[0] > 900:  # check this num later
                             print 'reinitializing ' + term + ' for hacky plotting method'
-                            self.no.get_ns_act(term, thresh=0, method='knn')
+                            self.no.est_ns_act(term, radius=10)
                             ge_ns_mat = self.no.matrix_builder([term], gene)
                     fig = plt.figure()
                     ax = fig.add_subplot(111)
@@ -304,11 +304,11 @@ class NsabaVisualizer(object):
                 raise ValueError("Gene %s has not been initialized. "
                                  "Use self.no.get_aba_ge([%s])" % str(gene))
 
-        if len(self.no.ge[genes[0]]['GE']) != len(self.no.ge[genes[1]]['GE']):
+        if len(self.no.ge[genes[0]]["mean"]['GE']) != len(self.no.ge[genes[1]]["mean"]['GE']):
             raise ValueError("'GE' size mismatched rerun Nsaba.estimate_aba_ge() again.")
 
-        g0 = self.no.ge[genes[0]]['GE']
-        g1 = self.no.ge[genes[1]]['GE']
+        g0 = self.no.ge[genes[0]]["mean"]['GE']
+        g1 = self.no.ge[genes[1]]["mean"]['GE']
         # Correlation
         correlation = np.corrcoef(g0, g1)
         # linear regression

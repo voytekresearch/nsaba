@@ -12,14 +12,19 @@ import random
 import collections
 import csv
 import os
+import warnings
 
 import numpy as np
 import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
 from scipy import stats
 from sklearn.cluster import KMeans
 from sklearn import mixture
+
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+
 
 
 def cohen_d(x1, x2, n1, n2):
@@ -42,6 +47,7 @@ class NsabaAnalysis(object):
             raise ValueError("NsabaAnalysis() parameter not a Nsaba instance")
 
         self.gene_rec = collections.namedtuple("gene_rec", "entrez cohen_d p_value")
+        self.default_quant = 85
         print "To use inline plotting functionality in Jupyter, '%matplotlib inline' must be enabled"
 
     def _mask_check(self, mask, method):
@@ -93,8 +99,7 @@ class NsabaAnalysis(object):
         """
         if method == 'quant':
             if 'quant' not in kwargs:
-                kwargs['quant'] = 85
-                # NOTE!!: This value ^ has a dependence in term_ge_ttest_multi
+                kwargs['quant'] = self.default_quant
             thres = np.percentile(term_vec, kwargs['quant'])
             mask = np.array([True if coeff > thres else False for coeff in term_vec])
             self._mask_check(mask, method)
@@ -162,6 +167,13 @@ class NsabaAnalysis(object):
 
         """
         analymat = self.no.matrix_builder([term], [gene])
+
+        non_nans = []
+        for ind, row in enumerate(analymat):
+            if not any(np.isnan(row)):
+                non_nans.append(ind)
+
+        analymat = analymat[non_nans]
 
         # Splitting groups
 
@@ -374,8 +386,17 @@ class NsabaAnalysis(object):
                 print "Using NIH described genes only; Entrez ID sample size now %d" % (len(sam_ids))
 
         # Fetching GE/NS activation matrix
-        ge_mat = self.no.matrix_builder([term], sam_ids).T[:-1]
-        term_act_vector = self.no.matrix_builder([term], sam_ids).T[-1:][0]
+        matrix = self.no.matrix_builder([term], sam_ids)
+
+        non_nans = []
+        for ind, row in enumerate(matrix):
+            if not any(np.isnan(row)):
+                non_nans.append(ind)
+
+        matrix = matrix[non_nans]
+
+        ge_mat = matrix.T[:-1]
+        term_act_vector = matrix.T[-1:][0]
 
         mask = self._split_mask(term_act_vector, method=split_method, **kwargs)
 
@@ -385,8 +406,7 @@ class NsabaAnalysis(object):
             if 'quant' in kwargs:
                 ttest_metrics['quant'] = kwargs['quant']
             else:
-                ttest_metrics['quant'] = 85
-                # NOTE!!! This dependent on _mask_split()'s default quant splitting value
+                ttest_metrics['quant'] = self.default_quant
 
         gene_stats = []
         for eid, ge in zip(sam_ids, ge_mat):
