@@ -397,8 +397,6 @@ class NsabaAnalysis(object):
 
         ge_mat = matrix.T[:-1]
         term_act_vector = matrix.T[-1:][0]
-        #ge_mat = self.no.matrix_builder([term], sam_ids).T[:-1]
-        #term_act_vector = self.no.matrix_builder([term], sam_ids).T[-1:][0]
 
         mask = self._split_mask(term_act_vector, method=split_method, **kwargs)
 

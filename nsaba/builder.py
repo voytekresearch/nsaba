@@ -7,7 +7,9 @@ operations with the Nsaba.
 Author: Simon Haxby & Torben Noto
 """
 from nsaba import Nsaba
+
 import numpy as np
+
 import urllib2
 from bs4 import BeautifulSoup
 from time import sleep
@@ -32,17 +34,17 @@ class NsabaBuilder(Nsaba):
                 print "Invalid response: %s" % y_n
         return 0
 
-    def get_aba_ge_all(self):
+    def get_aba_ge_all(self, **kwargs):
         """Returns a dictionary with ABA gene expression coefficient across all genes
         at sampled locations"""
 
         if self._proceed_check() == 1:
             return 1
 
-        entrez_ids = self.aba['probe_df']['entrez_id'][
-            self.aba['probe_df']['entrez_id'].notnull()].unique().astype(int)
+        entrez_ids = self._aba['probe_df']['entrez_id'][
+            self._aba['probe_df']['entrez_id'].notnull()].unique().astype(int)
 
-        self.get_aba_ge(entrez_ids)
+        self.estimate_aba_ge(entrez_ids, **kwargs)
 
     @not_operational
     def build_sparse_ge_mat(self, mni_grid_size=(200, 200, 200)):
