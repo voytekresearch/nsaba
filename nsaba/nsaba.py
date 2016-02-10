@@ -268,8 +268,7 @@ class Nsaba(NsabaBase):
         for entrez_id in entrez_ids:
             # Fetch probe IDs for Entrez ID
             probe_ids = self._aba['probe_df'].loc[self._aba['probe_df']['entrez_id']
-                                                 == entrez_id]['probe_id'].tolist()
-
+                                                  == entrez_id]['probe_id'].tolist()
             if len(probe_ids) == 0:
                 print 'Entrez ID: %s not registered with ABA database' % entrez_id
                 continue
@@ -397,6 +396,37 @@ class Nsaba(NsabaBase):
 
         self.ge = pickle.load(open(os.path.join(path, pkl_file), 'rb'))
         print "'ge' dictionary successfully loaded"
+
+    def pickle_ns(self, pkl_file="Nsaba_NS_act.pkl", output_dir='.'):
+        """
+        Stores Nsaba.term as pickle named by 'pkl_file' in directory 'output_dir'.
+
+        Parameters
+        ----------
+        pkl_file: string, optional
+            Name of pickle file.
+        output_dir: string, optional
+            Name of directory the pickle is to be written to;
+            '/' automatically added via os.path.join.
+        """
+
+        pickle.dump(self.term, open(os.path.join(output_dir, pkl_file), 'wb'))
+        print "%s successfully created" % pkl_file
+    def load_ns_pickle(self, pkl_file="Nsaba_NS_act.pkl", path='.'):
+        """
+        Loads pickle named by 'pkl_file' in directory 'output_dir' into Nsaba.term.
+
+        Parameters
+        ----------
+        pkl_file: string, optional
+            Name of pickle file.
+        path: string, optional
+            Path to directory the pickle is written to;
+            '/' automatically added via os.path.join.
+        """
+
+        self.term = pickle.load(open(os.path.join(path, pkl_file), 'rb'))
+        print "term dictionary successfully loaded"
 
     def is_gene(self, gene):
         """
@@ -715,7 +745,7 @@ class Nsaba(NsabaBase):
         if not entrez_ids == []:
             vec_len = len(self.ge[entrez_ids[0]]["mean"]['GE'])
         elif not ns_terms == []:
-            vec_len =  len(self.term[ns_terms[0]]['act'])
+            vec_len = len(self.term[ns_terms[0]]['act'])
         else:
             raise ValueError("ns_terms and entrez_ids parameters both 'None'; "
                              "at least one be set explicitly.")
