@@ -12,14 +12,19 @@ import random
 import collections
 import csv
 import os
+import warnings
 
 import numpy as np
 import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
 from scipy import stats
 from sklearn.cluster import KMeans
 from sklearn import mixture
+
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+
 
 
 def cohen_d(x1, x2, n1, n2):
@@ -162,6 +167,13 @@ class NsabaAnalysis(object):
 
         """
         analymat = self.no.matrix_builder([term], [gene])
+
+        non_nans = []
+        for ind, row in enumerate(analymat):
+            if not any(np.isnan(row)):
+                non_nans.append(ind)
+
+        analymat = analymat[non_nans]
 
         # Splitting groups
 
@@ -374,8 +386,17 @@ class NsabaAnalysis(object):
                 print "Using NIH described genes only; Entrez ID sample size now %d" % (len(sam_ids))
 
         # Fetching GE/NS activation matrix
-        ge_mat = self.no.matrix_builder([term], sam_ids).T[:-1]
-        term_act_vector = self.no.matrix_builder([term], sam_ids).T[-1:][0]
+        matrix = self.no.matrix_builder([term], sam_ids)
+
+        non_nans = []
+        for ind, row in enumerate(matrix):
+            if not any(np.isnan(row)):
+                non_nans.append(ind)
+
+        matrix = matrix[non_nans]
+
+        ge_mat = matrix.T[:-1]
+        term_act_vector = matrix.T[-1:][0]
 
         mask = self._split_mask(term_act_vector, method=split_method, **kwargs)
 
