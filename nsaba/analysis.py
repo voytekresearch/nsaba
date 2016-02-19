@@ -6,7 +6,7 @@ Author: Simon Haxby & Torben Noto
 
 from nsaba import Nsaba
 from nsabatools import preprint, not_operational
-from geneinfo import load_gene_file, get_gene_info, gene_info
+from geneinfo import load_gene_file, get_local_gene_info, scrape_nih_gene_info
 
 import random
 import collections

@@ -21,7 +21,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 
 
-def gene_info(eid):
+def scrape_nih_gene_info(eid):
     """
     Pulls gene data based on Entrez ID from the NIH and returns summary.
 
@@ -85,7 +85,7 @@ def load_gene_file(path='.'):
     else:
         raise TypeError("Gene-file path must be a string")
 
-def get_gene_info(path, gene_ids):
+def get_local_gene_info(path, gene_ids):
     """
     Extracts gene information from DataFrame created by
     load_gene_file() for specific genes based on list

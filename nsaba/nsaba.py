@@ -290,6 +290,7 @@ class Nsaba(NsabaBase):
             if 'z_score' in kwargs:
                 for row in xrange(ge_mat.shape[0]):
                     ge_mat[row] = (ge_mat[row]-ge_mat[row].mean())/ge_mat[row].std()
+                ge_vec = (ge_vec-ge_vec.mean())/ge_vec.std()
 
             if coords is None:
                 for row, probe in enumerate(probe_ids):
@@ -655,7 +656,7 @@ class Nsaba(NsabaBase):
         self.term[term] = {}
 
         if coords is None:
-            coords = self._aba['mni_coords']
+            coords = self._aba['mni_coords'].data
             self.term[term]['coord_type'] = 'ABA MNI'
         else:
             self.term[term]['coords'] = coords
@@ -674,11 +675,11 @@ class Nsaba(NsabaBase):
         X = ns_coord_tree.data
         y = ns_coord_act_df[term].as_matrix()
 
-        self.term[term]['classifier'].fit(X,y)
+        self.term[term]['classifier'].fit(X, y)
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            self.term[term]['act'] = self.term[term]['classifier'].predict(coords.data)
+            self.term[term]['act'] = self.term[term]['classifier'].predict(coords)
 
     def matrix_builder(self, ns_terms=None, entrez_ids=None):
         """
