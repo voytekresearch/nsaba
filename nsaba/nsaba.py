@@ -286,6 +286,11 @@ class Nsaba(NsabaBase):
                 self.ge[entrez_id][probe] = {}
             self.ge[entrez_id]["mean"] = {}
 
+            # z scoring method
+            if 'z_score' in kwargs:
+                for row in xrange(ge_mat.shape[0]):
+                    ge_mat[row] = (ge_mat[row]-ge_mat[row].mean())/ge_mat[row].std()
+
             if coords is None:
                 for row, probe in enumerate(probe_ids):
                     self.ge[entrez_id][probe]['GE'] = ge_mat[row]
@@ -298,19 +303,19 @@ class Nsaba(NsabaBase):
                     if 'radius' not in kwargs['rnn_args']:
                         kwargs['rnn_args']['radius'] = 5
                     for row, probe in enumerate(probe_ids):
-                        self.ge[entrez_id][probe]['classifer'] = RadiusNeighborsRegressor(**kwargs['rnn_args'])
-                    self.ge[entrez_id]["mean"]['classifer'] = RadiusNeighborsRegressor(**kwargs['rnn_args'])
+                        self.ge[entrez_id][probe]['classifier'] = RadiusNeighborsRegressor(**kwargs['rnn_args'])
+                    self.ge[entrez_id]["mean"]['classifier'] = RadiusNeighborsRegressor(**kwargs['rnn_args'])
                 else:
                     for row, probe in enumerate(probe_ids):
-                        self.ge[entrez_id][probe]['classifer'] = RadiusNeighborsRegressor(radius=5)
-                    self.ge[entrez_id]["mean"]['classifer'] = RadiusNeighborsRegressor(radius=5)
+                        self.ge[entrez_id][probe]['classifier'] = RadiusNeighborsRegressor(radius=5)
+                    self.ge[entrez_id]["mean"]['classifier'] = RadiusNeighborsRegressor(radius=5)
 
                 X = self._aba['mni_coords']
                 y_mean = ge_vec
 
                 for row, probe in enumerate(probe_ids):
-                     self.ge[entrez_id][probe]['classifer'].fit(X.data, ge_mat[row])
-                self.ge[entrez_id]["mean"]['classifer'].fit(X.data, y_mean)
+                     self.ge[entrez_id][probe]['classifier'].fit(X.data, ge_mat[row])
+                self.ge[entrez_id]["mean"]['classifier'].fit(X.data, y_mean)
 
                 if 'store_coords' in kwargs:
                     if kwargs['store_coords']:
@@ -324,8 +329,8 @@ class Nsaba(NsabaBase):
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
                     for row, probe in enumerate(probe_ids):
-                        self.ge[entrez_id][probe]["GE"] = self.ge[entrez_id][probe]['classifer'].predict(coords)
-                        self.ge[entrez_id]["mean"]["GE"] = self.ge[entrez_id]["mean"]['classifer'].predict(coords)
+                        self.ge[entrez_id][probe]["GE"] = self.ge[entrez_id][probe]['classifier'].predict(coords)
+                        self.ge[entrez_id]["mean"]["GE"] = self.ge[entrez_id]["mean"]['classifier'].predict(coords)
 
     def ge_ratio(self, entrez_ids, coords=None, **kwargs):
         """
@@ -662,18 +667,18 @@ class Nsaba(NsabaBase):
         if 'rnn_args' in kwargs:
             if 'radius' not in kwargs['rnn_args']:
                 kwargs['rnn_args']['radius'] = 5
-            self.term[term]['classifer'] = RadiusNeighborsRegressor(**kwargs['rnn_args'])
+            self.term[term]['classifier'] = RadiusNeighborsRegressor(**kwargs['rnn_args'])
         else:
-            self.term[term]['classifer'] = RadiusNeighborsRegressor(radius=5)
+            self.term[term]['classifier'] = RadiusNeighborsRegressor(radius=5)
 
         X = ns_coord_tree.data
         y = ns_coord_act_df[term].as_matrix()
 
-        self.term[term]['classifer'].fit(X,y)
+        self.term[term]['classifier'].fit(X,y)
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            self.term[term]['act'] = self.term[term]['classifer'].predict(coords.data)
+            self.term[term]['act'] = self.term[term]['classifier'].predict(coords.data)
 
     def matrix_builder(self, ns_terms=None, entrez_ids=None):
         """
