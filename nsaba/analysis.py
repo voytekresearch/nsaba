@@ -326,7 +326,7 @@ class NsabaAnalysis(object):
             raise ValueError("graphops parameter '%s' not recognized" % graphops)
 
     @preprint('This may take a couple of minutes ...')
-    def term_ge_ttest_multi(self, term, split_method='quant',sample_num=None, **kwargs):
+    def term_ge_ttest_multi(self, term, split_method='quant', sample_num=None, **kwargs):
         """
         Performs t-test equivalent to term_ge_t_test() across a subsample of Entrez IDs
         loaded into self.no. Default is to use all loaded Entrez ID genes.
@@ -455,7 +455,7 @@ class NsabaAnalysis(object):
                     Download gene name and description from NIH website.
                 'csv_path' : str
                     Specifies path to gene_info.csv
-                'printer' : bool, optional
+                'verbose' : bool, optional
                     Print most information about most significant genes.
 
         Returns
@@ -465,8 +465,8 @@ class NsabaAnalysis(object):
             additional gene description information.
 
         """
-        if 'printer' not in kwargs:
-            kwargs['printer'] = True
+        if 'verbose' not in kwargs:
+            kwargs['verbose'] = True
         if 'nih_dl' not in kwargs:
             kwargs['nih_dl'] = False
 
@@ -485,14 +485,14 @@ class NsabaAnalysis(object):
                     if kwargs['nih_dl']:
                         gene_name, gene_description = gene_info(str(rec.entrez))
                     else:
-                        gene_dat = get_gene_info(kwargs['csv_path'], [rec.entrez])
+                        gene_dat = get_local_gene_info(kwargs['csv_path'], [rec.entrez])
                         gene_name = gene_dat[0].name
                         gene_description = gene_dat[0].description
                     top_genes.append((rec.entrez, rec.cohen_d, rec.p_value, gene_name, gene_description))
                 except IndexError:
                     continue
 
-            if kwargs['printer']:
+            if kwargs['verbose']:
                 print "\nCorrected Bonferroni Alpha: %.3E\n\n" % (alpha / float(metrics['gene_sample_size']))
                 for eid, coh_d, p_val, gene_i, descr in top_genes:
                     if len(descr) == 1:
@@ -520,7 +520,7 @@ class NsabaAnalysis(object):
                 except IndexError:
                     continue
 
-            if kwargs['printer']:
+            if kwargs['verbose']:
                 print "\nCorrected Bonferroni Alpha: %.3E\n\n" % (alpha/float(len(self.no.ge.keys())))
                 for eid, rho, gene_i, descr in top_genes:
                     if len(descr) == 1:
