@@ -388,6 +388,7 @@ class Nsaba(NsabaBase):
         pickle.dump(self.ge, open(os.path.join(output_dir, pkl_file), 'wb'))
         print "%s successfully created" % pkl_file
 
+    @preprint('This may take a minute or two...')
     def load_ge_pickle(self, pkl_file="Nsaba_ABA_ge.pkl", path='.'):
         """
         Loads pickle named by 'pkl_file' in directory 'output_dir' into Nsaba.ge.
@@ -403,6 +404,39 @@ class Nsaba(NsabaBase):
 
         self.ge = pickle.load(open(os.path.join(path, pkl_file), 'rb'))
         print "'ge' dictionary successfully loaded"
+
+    def pickle_ns(self, pkl_file="Nsaba_NS_act.pkl", output_dir='.'):
+        """
+        Stores Nsaba.term as pickle named by 'pkl_file' in directory 'output_dir'.
+
+        Parameters
+        ----------
+        pkl_file: string, optional
+            Name of pickle file.
+        output_dir: string, optional
+            Name of directory the pickle is to be written to;
+            '/' automatically added via os.path.join.
+        """
+
+        pickle.dump(self.term, open(os.path.join(output_dir, pkl_file), 'wb'))
+        print "%s successfully created" % pkl_file
+
+    @preprint('This may take a minute or two ...')
+    def load_ns_pickle(self, pkl_file="Nsaba_NS_act.pkl", path='.'):
+        """
+        Loads pickle named by 'pkl_file' in directory 'output_dir' into Nsaba.term.
+
+        Parameters
+        ----------
+        pkl_file: string, optional
+            Name of pickle file.
+        path: string, optional
+            Path to directory the pickle is written to;
+            '/' automatically added via os.path.join.
+        """
+
+        self.term = pickle.load(open(os.path.join(path, pkl_file), 'rb'))
+        print "term dictionary successfully loaded"
 
     def is_gene(self, gene):
         """
@@ -683,7 +717,7 @@ class Nsaba(NsabaBase):
 
     def matrix_builder(self, ns_terms=None, entrez_ids=None):
         """
-        Generates a np.array() matrix of pre-estimated term actirvations and gene expression
+        Generates a np.array() matrix of pre-estimated term activations and gene expression
         coefficients.
 
         NOTE: All coefficient vectors must be same size; otherwise ValueError is raised.
