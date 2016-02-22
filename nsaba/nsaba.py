@@ -265,9 +265,6 @@ class Nsaba(NsabaBase):
 
         self._check_entrez_struct(entrez_ids)
 
-
-
-
         for entrez_id in entrez_ids:
             # Fetch probe IDs for Entrez ID
             probe_ids = self._aba['probe_df'].loc[self._aba['probe_df']['entrez_id']
@@ -280,11 +277,6 @@ class Nsaba(NsabaBase):
             # Return gene expression on given probes across sampled locations.
             ge_df = self._aba['exp_df'].loc[self._aba['exp_df']['probe_id'].isin(probe_ids)]
             ge_mat = ge_df.as_matrix().astype(float)[:, 1:]
-
-            # z scoring method
-            if 'z_score' in kwargs:
-                for row in xrange(ge_mat.shape[0]):
-                    ge_mat[row] = (ge_mat[row]-ge_mat[row].mean())/ge_mat[row].std()
 
             # Take average gene expression across probes at a given sampled location.
             ge_vec = np.mean(ge_mat, axis=0)
@@ -306,19 +298,19 @@ class Nsaba(NsabaBase):
                     if 'radius' not in kwargs['rnn_args']:
                         kwargs['rnn_args']['radius'] = 5
                     for row, probe in enumerate(probe_ids):
-                        self.ge[entrez_id][probe]['classifier'] = RadiusNeighborsRegressor(**kwargs['rnn_args'])
-                    self.ge[entrez_id]["mean"]['classifier'] = RadiusNeighborsRegressor(**kwargs['rnn_args'])
+                        self.ge[entrez_id][probe]['classifer'] = RadiusNeighborsRegressor(**kwargs['rnn_args'])
+                    self.ge[entrez_id]["mean"]['classifer'] = RadiusNeighborsRegressor(**kwargs['rnn_args'])
                 else:
                     for row, probe in enumerate(probe_ids):
-                        self.ge[entrez_id][probe]['classifier'] = RadiusNeighborsRegressor(radius=5)
-                    self.ge[entrez_id]["mean"]['classifier'] = RadiusNeighborsRegressor(radius=5)
+                        self.ge[entrez_id][probe]['classifer'] = RadiusNeighborsRegressor(radius=5)
+                    self.ge[entrez_id]["mean"]['classifer'] = RadiusNeighborsRegressor(radius=5)
 
                 X = self._aba['mni_coords']
                 y_mean = ge_vec
 
                 for row, probe in enumerate(probe_ids):
-                     self.ge[entrez_id][probe]['classifier'].fit(X.data, ge_mat[row])
-                self.ge[entrez_id]["mean"]['classifier'].fit(X.data, y_mean)
+                     self.ge[entrez_id][probe]['classifer'].fit(X.data, ge_mat[row])
+                self.ge[entrez_id]["mean"]['classifer'].fit(X.data, y_mean)
 
                 if 'store_coords' in kwargs:
                     if kwargs['store_coords']:
@@ -332,8 +324,8 @@ class Nsaba(NsabaBase):
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
                     for row, probe in enumerate(probe_ids):
-                        self.ge[entrez_id][probe]["GE"] = self.ge[entrez_id][probe]['classifier'].predict(coords)
-                        self.ge[entrez_id]["mean"]["GE"] = self.ge[entrez_id]["mean"]['classifier'].predict(coords)
+                        self.ge[entrez_id][probe]["GE"] = self.ge[entrez_id][probe]['classifer'].predict(coords)
+                        self.ge[entrez_id]["mean"]["GE"] = self.ge[entrez_id]["mean"]['classifer'].predict(coords)
 
     def ge_ratio(self, entrez_ids, coords=None, **kwargs):
         """
@@ -670,18 +662,18 @@ class Nsaba(NsabaBase):
         if 'rnn_args' in kwargs:
             if 'radius' not in kwargs['rnn_args']:
                 kwargs['rnn_args']['radius'] = 5
-            self.term[term]['classifier'] = RadiusNeighborsRegressor(**kwargs['rnn_args'])
+            self.term[term]['classifer'] = RadiusNeighborsRegressor(**kwargs['rnn_args'])
         else:
-            self.term[term]['classifier'] = RadiusNeighborsRegressor(radius=5)
+            self.term[term]['classifer'] = RadiusNeighborsRegressor(radius=5)
 
         X = ns_coord_tree.data
         y = ns_coord_act_df[term].as_matrix()
 
-        self.term[term]['classifier'].fit(X,y)
+        self.term[term]['classifer'].fit(X,y)
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            self.term[term]['act'] = self.term[term]['classifier'].predict(coords.data)
+            self.term[term]['act'] = self.term[term]['classifer'].predict(coords.data)
 
     def matrix_builder(self, ns_terms=None, entrez_ids=None):
         """
