@@ -58,6 +58,7 @@ def scrape_nih_gene_info(eid):
     else:
         raise TypeError("gene no must be a string")
 
+
 def load_gene_file(path='.'):
     """
     Loads file containing gene descriptions of genes specified by
@@ -84,6 +85,7 @@ def load_gene_file(path='.'):
         return df
     else:
         raise TypeError("Gene-file path must be a string")
+
 
 def get_local_gene_info(path, gene_ids):
     """
@@ -115,6 +117,7 @@ def get_local_gene_info(path, gene_ids):
         else:
             print 'Gene %s not found in NIH database' % gene_id
     return output
+
 
 def fetch_entrez_ids(term, id_num):
     """
