@@ -216,85 +216,84 @@ class NsabaAnalysis(object):
         else:
             raise ValueError("graphops parameter '%s' not recognized" % graphops)
 
+    def ge_term_ttest(self, term, gene, split_method='quant', graphops='density', **kwargs):
+            """
+            Performs a t-test on the association with a given term between regions with
+            low expression and high expression of a given gene.
 
-def ge_term_ttest(self, term, gene, split_method='quant', graphops='density', **kwargs):
-        """
-        Performs a t-test on the association with a given term between regions with
-        low expression and high expression of a given gene.
+            Parameters
+            ----------
+                term : str
+                    NS term to be t-tested.
 
-        Parameters
-        ----------
-            term : str
-                NS term to be t-tested.
+                gene : int
+                    Entrez ID to index regions for t-test.
 
-            gene : int
-                Entrez ID to index regions for t-test.
+                split_method : str, optional
 
-            split_method : str, optional
+                graphops : str, optional
+                    OPTIONS:
+                        'density' : Distribution density plot of control and functional network expression.
+                        'box' : Box plot of control and functional network expression.
+                        'violin' : Violin plot of control and functional network expression.
 
-            graphops : str, optional
-                OPTIONS:
-                    'density' : Distribution density plot of control and functional network expression.
-                    'box' : Box plot of control and functional network expression.
-                    'violin' : Violin plot of control and functional network expression.
+                kwargs : dict
+                    OPTIONS:
+                        'log' : term activation values are log-spaced.
 
-            kwargs : dict
-                OPTIONS:
-                    'log' : term activation values are log-spaced.
+                    PASSED:
+                        _split_mask()
 
-                PASSED:
-                    _split_mask()
+            """
+            analymat = self.no.matrix_builder([term], [gene])
 
-        """
-        analymat = self.no.matrix_builder([term], [gene])
+            non_nans = []
+            for ind, row in enumerate(analymat):
+                if not any(np.isnan(row)):
+                    non_nans.append(ind)
 
-        non_nans = []
-        for ind, row in enumerate(analymat):
-            if not any(np.isnan(row)):
-                non_nans.append(ind)
+            analymat = analymat[non_nans]
 
-        analymat = analymat[non_nans]
+            # Splitting groups
 
-        # Splitting groups
+            mask = self._split_mask(analymat[:, 0], method=split_method, **kwargs) #1 to 0 switch
+            cont_grp, funct_grp = self._split_groups(analymat[:, 1], mask) #0 to 1 switch
+            if 'log' in kwargs:
+                if kwargs['log']:
+                    funct_grp = np.log(funct_grp)
+                    cont_grp = np.log(cont_grp)
 
-        mask = self._split_mask(analymat[:, 0], method=split_method, **kwargs) #1 to 0 switch
-        cont_grp, funct_grp = self._split_groups(analymat[:, 1], mask) #0 to 1 switch
-        if 'log' in kwargs:
-            if kwargs['log']:
-                funct_grp = np.log(funct_grp)
-                cont_grp = np.log(cont_grp)
-
-        # T-Test
-        print "t-value: %.4f \np-value: %.3E" % stats.ttest_ind(cont_grp, funct_grp)
-        print "Effect size: %.4f" % cohen_d(cont_grp, funct_grp, len(cont_grp), len(funct_grp))
-        print "Control/Functional Split: %d/%d\n" % (len(mask)-sum(mask), sum(mask))
-        # Histogram/KDE Plots
-        if graphops == 'density':
-            ax = plt.axes()
-            ax.set_title('Term Distributions')
-            ax.set_xlabel(str(term))
-            ax.set_ylabel('density')
-            sns.distplot(funct_grp, ax=ax, label=term)
-            sns.distplot(cont_grp, label='null')
-            plt.legend()
-        elif graphops == 'box':
-            ax = plt.axes()
-            ax.boxplot([cont_grp, funct_grp])
-            ax.set_xticks([1, 2])
-            ax.set_xticklabels(["Low '"+gene+"'", "High '"+gene+"'"])
-            ax.set_ylabel('Term Association')
-        elif graphops == 'violin':
-            ax = plt.axes()
-            ax.violinplot([cont_grp, funct_grp])
-            ax.set_xticks([1, 2])
-            ax.set_xticklabels(["Low '"+term+"'", "High '"+term+"'"])
-            ax.set_ylabel('Term Association')
-            ax.plot(np.ones(len(cont_grp)), cont_grp, 'b.')
-            ax.plot(1, np.mean(cont_grp), 'bs')
-            ax.plot(2*np.ones(len(funct_grp)), funct_grp, 'g.')
-            ax.plot(2, np.mean(funct_grp), 'gs')
-        else:
-            raise ValueError("graphops parameter '%s' not recognized" % graphops)
+            # T-Test
+            print "t-value: %.4f \np-value: %.3E" % stats.ttest_ind(cont_grp, funct_grp)
+            print "Effect size: %.4f" % cohen_d(cont_grp, funct_grp, len(cont_grp), len(funct_grp))
+            print "Control/Functional Split: %d/%d\n" % (len(mask)-sum(mask), sum(mask))
+            # Histogram/KDE Plots
+            if graphops == 'density':
+                ax = plt.axes()
+                ax.set_title('Term Distributions')
+                ax.set_xlabel(str(term))
+                ax.set_ylabel('density')
+                sns.distplot(funct_grp, ax=ax, label=term)
+                sns.distplot(cont_grp, label='null')
+                plt.legend()
+            elif graphops == 'box':
+                ax = plt.axes()
+                ax.boxplot([cont_grp, funct_grp])
+                ax.set_xticks([1, 2])
+                ax.set_xticklabels(["Low '"+gene+"'", "High '"+gene+"'"])
+                ax.set_ylabel('Term Association')
+            elif graphops == 'violin':
+                ax = plt.axes()
+                ax.violinplot([cont_grp, funct_grp])
+                ax.set_xticks([1, 2])
+                ax.set_xticklabels(["Low '"+term+"'", "High '"+term+"'"])
+                ax.set_ylabel('Term Association')
+                ax.plot(np.ones(len(cont_grp)), cont_grp, 'b.')
+                ax.plot(1, np.mean(cont_grp), 'bs')
+                ax.plot(2*np.ones(len(funct_grp)), funct_grp, 'g.')
+                ax.plot(2, np.mean(funct_grp), 'gs')
+            else:
+                raise ValueError("graphops parameter '%s' not recognized" % graphops)
 
 
 
