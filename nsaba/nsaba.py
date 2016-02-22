@@ -286,6 +286,12 @@ class Nsaba(NsabaBase):
                 self.ge[entrez_id][probe] = {}
             self.ge[entrez_id]["mean"] = {}
 
+            # z scoring method
+            if 'z_score' in kwargs:
+                for row in xrange(ge_mat.shape[0]):
+                    ge_mat[row] = (ge_mat[row]-ge_mat[row].mean())/ge_mat[row].std()
+                ge_vec = (ge_vec-ge_vec.mean())/ge_vec.std()
+
             if coords is None:
                 for row, probe in enumerate(probe_ids):
                     self.ge[entrez_id][probe]['GE'] = ge_mat[row]
@@ -298,19 +304,19 @@ class Nsaba(NsabaBase):
                     if 'radius' not in kwargs['rnn_args']:
                         kwargs['rnn_args']['radius'] = 5
                     for row, probe in enumerate(probe_ids):
-                        self.ge[entrez_id][probe]['classifer'] = RadiusNeighborsRegressor(**kwargs['rnn_args'])
-                    self.ge[entrez_id]["mean"]['classifer'] = RadiusNeighborsRegressor(**kwargs['rnn_args'])
+                        self.ge[entrez_id][probe]['classifier'] = RadiusNeighborsRegressor(**kwargs['rnn_args'])
+                    self.ge[entrez_id]["mean"]['classifier'] = RadiusNeighborsRegressor(**kwargs['rnn_args'])
                 else:
                     for row, probe in enumerate(probe_ids):
-                        self.ge[entrez_id][probe]['classifer'] = RadiusNeighborsRegressor(radius=5)
-                    self.ge[entrez_id]["mean"]['classifer'] = RadiusNeighborsRegressor(radius=5)
+                        self.ge[entrez_id][probe]['classifier'] = RadiusNeighborsRegressor(radius=5)
+                    self.ge[entrez_id]["mean"]['classifier'] = RadiusNeighborsRegressor(radius=5)
 
                 X = self._aba['mni_coords']
                 y_mean = ge_vec
 
                 for row, probe in enumerate(probe_ids):
-                     self.ge[entrez_id][probe]['classifer'].fit(X.data, ge_mat[row])
-                self.ge[entrez_id]["mean"]['classifer'].fit(X.data, y_mean)
+                     self.ge[entrez_id][probe]['classifier'].fit(X.data, ge_mat[row])
+                self.ge[entrez_id]["mean"]['classifier'].fit(X.data, y_mean)
 
                 if 'store_coords' in kwargs:
                     if kwargs['store_coords']:
@@ -324,8 +330,8 @@ class Nsaba(NsabaBase):
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
                     for row, probe in enumerate(probe_ids):
-                        self.ge[entrez_id][probe]["GE"] = self.ge[entrez_id][probe]['classifer'].predict(coords)
-                        self.ge[entrez_id]["mean"]["GE"] = self.ge[entrez_id]["mean"]['classifer'].predict(coords)
+                        self.ge[entrez_id][probe]["GE"] = self.ge[entrez_id][probe]['classifier'].predict(coords)
+                        self.ge[entrez_id]["mean"]["GE"] = self.ge[entrez_id]["mean"]['classifier'].predict(coords)
 
     def ge_ratio(self, entrez_ids, coords=None, **kwargs):
         """
@@ -382,6 +388,7 @@ class Nsaba(NsabaBase):
         pickle.dump(self.ge, open(os.path.join(output_dir, pkl_file), 'wb'))
         print "%s successfully created" % pkl_file
 
+    @preprint('This may take a minute or two...')
     def load_ge_pickle(self, pkl_file="Nsaba_ABA_ge.pkl", path='.'):
         """
         Loads pickle named by 'pkl_file' in directory 'output_dir' into Nsaba.ge.
@@ -397,6 +404,39 @@ class Nsaba(NsabaBase):
 
         self.ge = pickle.load(open(os.path.join(path, pkl_file), 'rb'))
         print "'ge' dictionary successfully loaded"
+
+    def pickle_ns(self, pkl_file="Nsaba_NS_act.pkl", output_dir='.'):
+        """
+        Stores Nsaba.term as pickle named by 'pkl_file' in directory 'output_dir'.
+
+        Parameters
+        ----------
+        pkl_file: string, optional
+            Name of pickle file.
+        output_dir: string, optional
+            Name of directory the pickle is to be written to;
+            '/' automatically added via os.path.join.
+        """
+
+        pickle.dump(self.term, open(os.path.join(output_dir, pkl_file), 'wb'))
+        print "%s successfully created" % pkl_file
+
+    @preprint('This may take a minute or two ...')
+    def load_ns_pickle(self, pkl_file="Nsaba_NS_act.pkl", path='.'):
+        """
+        Loads pickle named by 'pkl_file' in directory 'output_dir' into Nsaba.term.
+
+        Parameters
+        ----------
+        pkl_file: string, optional
+            Name of pickle file.
+        path: string, optional
+            Path to directory the pickle is written to;
+            '/' automatically added via os.path.join.
+        """
+
+        self.term = pickle.load(open(os.path.join(path, pkl_file), 'rb'))
+        print "term dictionary successfully loaded"
 
     def is_gene(self, gene):
         """
@@ -650,7 +690,7 @@ class Nsaba(NsabaBase):
         self.term[term] = {}
 
         if coords is None:
-            coords = self._aba['mni_coords']
+            coords = self._aba['mni_coords'].data
             self.term[term]['coord_type'] = 'ABA MNI'
         else:
             self.term[term]['coords'] = coords
@@ -662,22 +702,22 @@ class Nsaba(NsabaBase):
         if 'rnn_args' in kwargs:
             if 'radius' not in kwargs['rnn_args']:
                 kwargs['rnn_args']['radius'] = 5
-            self.term[term]['classifer'] = RadiusNeighborsRegressor(**kwargs['rnn_args'])
+            self.term[term]['classifier'] = RadiusNeighborsRegressor(**kwargs['rnn_args'])
         else:
-            self.term[term]['classifer'] = RadiusNeighborsRegressor(radius=5)
+            self.term[term]['classifier'] = RadiusNeighborsRegressor(radius=5)
 
         X = ns_coord_tree.data
         y = ns_coord_act_df[term].as_matrix()
 
-        self.term[term]['classifer'].fit(X,y)
+        self.term[term]['classifier'].fit(X, y)
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            self.term[term]['act'] = self.term[term]['classifer'].predict(coords.data)
+            self.term[term]['act'] = self.term[term]['classifier'].predict(coords)
 
     def matrix_builder(self, ns_terms=None, entrez_ids=None):
         """
-        Generates a np.array() matrix of pre-estimated term actirvations and gene expression
+        Generates a np.array() matrix of pre-estimated term activations and gene expression
         coefficients.
 
         NOTE: All coefficient vectors must be same size; otherwise ValueError is raised.

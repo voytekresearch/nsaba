@@ -14,42 +14,9 @@ Save the decompressed output of this file to somewhere you will remember (/Users
 
 ## Example Usage:
 
-    from nsaba.nsaba import Nsaba
-
-Specifying paths to Allen Brain Atlas and Neurosynth data files.
-
-    aba_path = '/Users/User/Documents/Nsaba_analysis/normalized_microarray_donor9861/'
-    ns_path = '/Users/User/Documents/Nsaba_analysis/current_data/'
-
-    Nsaba.aba_load(aba_path)
-    Nsaba.ns_load(ns_path)
-
-Declaring Entrez IDs for genes of interest: in this case [1813](http://www.ncbi.nlm.nih.gov/gene/?term=1813) and 
-[1816](http://www.ncbi.nlm.nih.gov/gene/?term=1816).
-
-    entrez_ids = [1813, 1816]
-	my_term = 'attention'
-    att = Nsaba()
+See for this [notebook](https://github.com/voytekresearch/nsaba/blob/master/notebooks/demos/Nsaba_Long_Demo.ipynb) for a full demonstration.    
 
 
-Generating gene expression and term tf-idf statistics.
-
-    att.estimate_aba_ge(entrez_ids)
-    att.estimate_ns_act(my_term, knn_args={'n_neighbors':10})
-    analysis_matrix = att.matrix_builder(my_term, entrez_ids)
-    
-Nsaba comes with an analysis module to aid with large-scale significance testing and information
-retrieval.
-
-    import nsaba.analyis as na
-     
-    ....
-    
-    att_stats  = na.NsabaAnalysis(att)
-    tttest_metrics = att_stats.term_ge_ttest_multi('reward',quant=90)
-    att_stats.fetch_gene_descriptions(tttest_metrics)
-    
-See for this [notebook](https://github.com/voytekresearch/nsaba/blob/master/notebooks/demos/Nsaba_Demonstration.ipynb) for a full demonstration.    
 
 ## Futures
 

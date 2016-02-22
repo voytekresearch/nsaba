@@ -139,7 +139,7 @@ class NsabaVisualizer(object):
     def lstsq_ge_ns(self, gene, term, logy=False, logx=False):
         self.lstsq_ns_ge(self, term, gene, logy=logy, logx=logx)
 
-    def lstsq_ns_ge(self, term, gene, logy=False, logx=False, only_term=False):
+    def lstsq_ns_ge(self, term, gene, logy=False, logx=False, only_term=False, verbose=False):
         """
         Generates a linear regression plot for gene expression to
         term activation.
@@ -185,12 +185,17 @@ class NsabaVisualizer(object):
                     if logx:
                         ax.set_xscale('log')
 
+                    # remove nans
+                    valid1 = np.isfinite(ge_ns_mat[:, 0])
+                    valid2 = np.isfinite(ge_ns_mat[:, 1])
+                    valid_inds = np.logical_and(valid1, valid2)
+
                     # correlation
-                    correlation = np.corrcoef(ge_ns_mat[:, 0], ge_ns_mat[:, 1])
+                    r, p = np.corrcoef(ge_ns_mat[:, 0][valid_inds], ge_ns_mat[:, 1][valid_inds])
 
                     # linear regression
-                    X = np.vstack([ge_ns_mat[:, 0], np.ones(len(ge_ns_mat[:, 0]))]).T
-                    m, c = np.linalg.lstsq(X, ge_ns_mat[:, 1])[0]
+                    X = np.vstack([ge_ns_mat[:, 0][valid_inds], np.ones(len(ge_ns_mat[:, 0][valid_inds]))]).T
+                    m, c = np.linalg.lstsq(X, ge_ns_mat[:, 1][valid_inds])[0]
 
                     # print 'Correlation between ' + term + ' and gene number ' + str(gene)
                     # print correlation
@@ -198,12 +203,14 @@ class NsabaVisualizer(object):
                     #       +' Slope =' + str(m) + ' y intercept = '+ str(c)
 
                     ax.plot(ge_ns_mat[:, 0], ge_ns_mat[:, 1], '.')
-                    ax.plot([min(ge_ns_mat[:, 0]), max(ge_ns_mat[:, 0])], [m*min(ge_ns_mat[:, 0])+c,
-                                                                           m*max(ge_ns_mat[:, 0])+c], 'r')
+                    ax.plot([min(ge_ns_mat[:, 0]), max(ge_ns_mat[:, 0][valid_inds])], [m*min(ge_ns_mat[:, 0][valid_inds])+c,
+                                                                           m*max(ge_ns_mat[:, 0][valid_inds])+c], 'r')
                     ax.set_xlabel(str(gene))
                     ax.set_ylabel(term)
-
-                    return correlation, [m, c]
+                    if verbose == True:
+                        print 'correlation: r=' + str(r) + ' p='+str(p) + '\n'
+                        print 'linear regression: m=' + str(m) + ' c=' + str(c)
+                    return [r, p], [m, c]
                 else:
                     raise ValueError("Term '%s' has not been initialized. Use get_ns_act('%s')" % term)
             else:
@@ -241,12 +248,17 @@ class NsabaVisualizer(object):
         """
         if term1 in self.no.term:
             if term2 in self.no.term:
+                # remove nans
+                valid1 = np.isfinite(self.no.term[term1]['act'])
+                valid2 = np.isfinite(self.no.term[term1]['act'])
+                valid_inds = np.logical_and(valid1, valid2)
+
                 # Correlation
-                correlation = np.corrcoef(self.no.term[term1]['act'], self.no.term[term2]['act'])
+                correlation = np.corrcoef(self.no.term[term1]['act'][valid_inds], self.no.term[term2]['act'][valid_inds])
                 # linear Regression
-                regression_matrix = np.vstack([self.no.term[term1]['act'],
-                                               np.ones(len(self.no.term[term1]['act']))]).T
-                m, c = np.linalg.lstsq(regression_matrix, self.no.term[term2]['act'])[0]
+                regression_matrix = np.vstack([self.no.term[term1]['act'][valid_inds],
+                                               np.ones(len(self.no.term[term1]['act'][valid_inds]))]).T
+                m, c = np.linalg.lstsq(regression_matrix, self.no.term[term2]['act'][valid_inds])[0]
 
                 # Plotting
                 fig = plt.figure()
@@ -255,10 +267,10 @@ class NsabaVisualizer(object):
                     ax.set_yscale('log')
                 if logx:
                     ax.set_xscale('log')
-                ax.plot(self.no.term[term1]['act'], self.no.term[term2]['act'], '.')
-                ax.plot([min(self.no.term[term1]['act']), max(self.no.term[term1]['act'])],
-                        [m*min(self.no.term[term2]['act'])+c,
-                         m*max(self.no.term[term2]['act'])+c], 'r')
+                ax.plot(self.no.term[term1]['act'][valid_inds], self.no.term[term2]['act'][valid_inds], '.')
+                ax.plot([min(self.no.term[term1]['act'][valid_inds]), max(self.no.term[term1]['act'][valid_inds])],
+                        [m*min(self.no.term[term2]['act'][valid_inds])+c,
+                         m*max(self.no.term[term2]['act'][valid_inds])+c], 'r')
                 ax.set_xlabel(term1)
                 ax.set_ylabel(term2)
                 return correlation, [m, c]
