@@ -354,7 +354,6 @@ class Nsaba(NsabaBase):
                 for row, probe in enumerate(probe_ids):
                     self.ge[entrez_id][probe]['classifier'].fit(X, ge_mat[row])
                 self.ge[entrez_id]["mean"]['classifier'].fit(X, y_mean)
-
                 if 'store_coords' in kwargs:
                     if kwargs['store_coords']:
                         self.ge[entrez_id]['coords'] = coords
