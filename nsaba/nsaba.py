@@ -15,6 +15,7 @@ import warnings
 import numpy as np
 import pandas as pd
 from scipy import spatial
+from scipy import signal
 
 from sklearn.neighbors import RadiusNeighborsRegressor
 from nsabatools import not_operational, preprint
@@ -182,6 +183,7 @@ class Nsaba(NsabaBase):
         self.ge = {}
         self.term = {}
         self.ns_weight_f = lambda r: 1. / np.power(r, 2)
+        self._gaussian_weight_radius = 5
 
     def get_ns_struct(self, key=None):
         """
@@ -194,7 +196,6 @@ class Nsaba(NsabaBase):
             Name of specified sub-structure of _ns if provided;
             else _ns dictionary is returned.
         """
-
         if not key:
             return self._ns
         else:
@@ -244,6 +245,33 @@ class Nsaba(NsabaBase):
         else:
             if isinstance(entrez_ids, str):
                 raise TypeError("Invalid parameter form; please contain entrez ids in iterable container")
+
+    def _check_coords_for_distance_weighting(self, coords, check_radius, check_weights, X, y_mean):
+        """
+        Checks that coords won't break the distance weighting function
+
+        """
+        valid_inds = []
+        for coord in xrange(len(coords)):
+
+            temp = RadiusNeighborsRegressor(radius=check_radius, weights=check_weights)
+            temp.fit(X, y_mean)
+            try:
+                temp.predict([coords[coord]])
+                valid_inds.append(coord)
+            except ZeroDivisionError:
+                continue
+        return valid_inds
+
+    def _gaussian_weight_function(self, estimation_distances):
+        """custom function to weight distance by gaussian smoothing"""
+        radius = self._gaussian_weight_radius
+        radius_gaussian = signal.gaussian(radius*2+1, radius/2.0, sym=True)
+        rad_fit_to_gaussian = radius_gaussian[radius:radius+radius+1]
+        weights = []
+        for ele in estimation_distances:
+            weights.append([rad_fit_to_gaussian[int(rad_i)] for rad_i in ele])
+        return weights
 
     def estimate_aba_ge(self, entrez_ids, coords=None, **kwargs):
         """
@@ -300,9 +328,21 @@ class Nsaba(NsabaBase):
 
             # Estimate gene expression at custom coordinates
             else:
+                valid_inds = range(len(coords))
+                X = self._aba['mni_coords'].data
+                y_mean = ge_vec
+
                 if 'rnn_args' in kwargs:
                     if 'radius' not in kwargs['rnn_args']:
                         kwargs['rnn_args']['radius'] = 5
+                    if 'radius' in kwargs['rnn_args']:
+                        if kwargs['rnn_args']['radius'] == 1:
+                            kwargs['weights'] = 'uniform'
+                    if 'weights' in kwargs['rnn_args']:
+                        valid_inds = self._check_coords_for_distance_weighting(coords=coords, check_radius=kwargs['rnn_args']['radius'], check_weights='distance', X=X, y_mean=y_mean)
+                    if 'weights' != 'distance':
+                        self._gaussian_weight_radius = kwargs['rnn_args']['radius']
+
                     for row, probe in enumerate(probe_ids):
                         self.ge[entrez_id][probe]['classifier'] = RadiusNeighborsRegressor(**kwargs['rnn_args'])
                     self.ge[entrez_id]["mean"]['classifier'] = RadiusNeighborsRegressor(**kwargs['rnn_args'])
@@ -311,12 +351,9 @@ class Nsaba(NsabaBase):
                         self.ge[entrez_id][probe]['classifier'] = RadiusNeighborsRegressor(radius=5)
                     self.ge[entrez_id]["mean"]['classifier'] = RadiusNeighborsRegressor(radius=5)
 
-                X = self._aba['mni_coords']
-                y_mean = ge_vec
-
                 for row, probe in enumerate(probe_ids):
-                     self.ge[entrez_id][probe]['classifier'].fit(X.data, ge_mat[row])
-                self.ge[entrez_id]["mean"]['classifier'].fit(X.data, y_mean)
+                    self.ge[entrez_id][probe]['classifier'].fit(X, ge_mat[row])
+                self.ge[entrez_id]["mean"]['classifier'].fit(X, y_mean)
 
                 if 'store_coords' in kwargs:
                     if kwargs['store_coords']:
@@ -329,9 +366,22 @@ class Nsaba(NsabaBase):
 
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
+                    nan_array = np.empty(len(coords))
+                    nan_array[:] = np.nan
                     for row, probe in enumerate(probe_ids):
-                        self.ge[entrez_id][probe]["GE"] = self.ge[entrez_id][probe]['classifier'].predict(coords)
-                        self.ge[entrez_id]["mean"]["GE"] = self.ge[entrez_id]["mean"]['classifier'].predict(coords)
+                        self.ge[entrez_id][probe]["GE"] = nan_array
+                        if len(valid_inds) > 0:
+                            estimations = self.ge[entrez_id][probe]['classifier'].predict([coords[i] for i in valid_inds])
+                            for vi in xrange(len(valid_inds)):
+                                self.ge[entrez_id][probe]["GE"][valid_inds[vi]] = estimations[vi]
+
+                    self.ge[entrez_id]["mean"]["GE"] = nan_array
+                    if len(valid_inds) > 0:
+                        estimations = self.ge[entrez_id]["mean"]['classifier'].predict([coords[i] for i in valid_inds])
+                        for vi in xrange(len(valid_inds)):
+                            self.ge[entrez_id]["mean"]["GE"][vi] = estimations[vi]
+
+
 
     def ge_ratio(self, entrez_ids, coords=None, **kwargs):
         """
