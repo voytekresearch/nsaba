@@ -328,9 +328,9 @@ class Nsaba(NsabaBase):
 
             # Estimate gene expression at custom coordinates
             else:
-                valid_inds = range(len(coords))
                 X = self._aba['mni_coords'].data
                 y_mean = ge_vec
+                valid_inds = self._check_coords_for_distance_weighting(coords=coords, check_radius=kwargs['rnn_args']['radius'], check_weights='distance', X=X, y_mean=y_mean)
 
                 if 'rnn_args' in kwargs:
                     if 'radius' not in kwargs['rnn_args']:
@@ -338,18 +338,17 @@ class Nsaba(NsabaBase):
                     if 'radius' in kwargs['rnn_args']:
                         if kwargs['rnn_args']['radius'] == 1:
                             kwargs['weights'] = 'uniform'
-                    if 'weights' in kwargs['rnn_args']:
-                        valid_inds = self._check_coords_for_distance_weighting(coords=coords, check_radius=kwargs['rnn_args']['radius'], check_weights='distance', X=X, y_mean=y_mean)
+                    if 'weights' not in kwargs['rnn_args']:
+                        kwargs['weights'] = 'uniform'
                     if 'weights' != 'distance':
                         self._gaussian_weight_radius = kwargs['rnn_args']['radius']
-
                     for row, probe in enumerate(probe_ids):
                         self.ge[entrez_id][probe]['classifier'] = RadiusNeighborsRegressor(**kwargs['rnn_args'])
                     self.ge[entrez_id]["mean"]['classifier'] = RadiusNeighborsRegressor(**kwargs['rnn_args'])
                 else:
                     for row, probe in enumerate(probe_ids):
-                        self.ge[entrez_id][probe]['classifier'] = RadiusNeighborsRegressor(radius=5)
-                    self.ge[entrez_id]["mean"]['classifier'] = RadiusNeighborsRegressor(radius=5)
+                        self.ge[entrez_id][probe]['classifier'] = RadiusNeighborsRegressor(radius=5, weights='uniform')
+                    self.ge[entrez_id]["mean"]['classifier'] = RadiusNeighborsRegressor(radius=5, weights='uniform')
 
                 for row, probe in enumerate(probe_ids):
                     self.ge[entrez_id][probe]['classifier'].fit(X, ge_mat[row])
@@ -379,8 +378,6 @@ class Nsaba(NsabaBase):
                         estimations = self.ge[entrez_id]["mean"]['classifier'].predict([coords[i] for i in valid_inds])
                         for vi in xrange(len(valid_inds)):
                             self.ge[entrez_id]["mean"]["GE"][vi] = estimations[vi]
-
-
 
     def ge_ratio(self, entrez_ids, coords=None, **kwargs):
         """

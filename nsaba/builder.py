@@ -46,6 +46,17 @@ class NsabaBuilder(Nsaba):
 
         self.estimate_aba_ge(entrez_ids, **kwargs)
 
+    def get_ns_act_all(self, **kwargs):
+        """Returns a dictionary with NS term coefficients across all terms
+        at ABA locations"""
+
+        if self._proceed_check() == 1:
+            return 1
+
+        terms = self._ns['features_df'].columns.values[1:]
+        for term in terms:
+            self.estimate_ns_act(term, **kwargs)
+
     @not_operational
     def build_sparse_ge_mat(self, mni_grid_size=(200, 200, 200)):
         """Builds sparse 3D MNI numpy grid, and assigns a gene expression pointer to that coordinate"""

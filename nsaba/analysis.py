@@ -280,13 +280,13 @@ class NsabaAnalysis(object):
                 ax = plt.axes()
                 ax.boxplot([cont_grp, funct_grp])
                 ax.set_xticks([1, 2])
-                ax.set_xticklabels(["Low '"+gene+"'", "High '"+gene+"'"])
+                ax.set_xticklabels(["Low "+str(gene), "High "+str(gene)])
                 ax.set_ylabel('Term Association')
             elif graphops == 'violin':
                 ax = plt.axes()
                 ax.violinplot([cont_grp, funct_grp])
                 ax.set_xticks([1, 2])
-                ax.set_xticklabels(["Low '"+term+"'", "High '"+term+"'"])
+                ax.set_xticklabels(["Low "+str(gene), "High "+str(gene)])
                 ax.set_ylabel('Term Association')
                 ax.plot(np.ones(len(cont_grp)), cont_grp, 'b.')
                 ax.plot(1, np.mean(cont_grp), 'bs')
@@ -320,6 +320,31 @@ class NsabaAnalysis(object):
 
         # Calculates Spearman's Rho for each across all genes for a given term
         return [stats.spearmanr(ge_mat[:, ge_mat.shape[1]-1], ge_mat[:, r])[0]
+                for r in xrange(len(self.no.ge.keys()))]
+
+    @preprint('This may take a couple of minutes ...')
+    def ge_term_spearman_rho(self, entrez):
+        """"
+        Calculates Spearman's Rho for each across all genes for a given term.
+
+        Parameters
+        ----------
+        entrez : str
+            entrez id of gene of interest
+
+        Returns
+        -------
+        list : [ len(ge.keys()) ]
+            Returns a list of Spearman coefficients corresponding to the Spearman
+            correlation between term activation for 'term' and gene expression for
+            all genes loaded into the base Nsaba object.
+        """
+        if entrez not in self.no.ge:
+            raise ValueError("Gene estimation not generated for '%s" % entrez)
+        ge_mat = self.no.matrix_builder([self.no.term.keys()], self.no.ge[entrez])
+
+        # Calculates Spearman's Rho on all terms for a given gene
+        return [stats.spearmanr(ge_mat[:, ge_mat.shape[1]-1], ge_mat[:, r])[0]  # fix
                 for r in xrange(len(self.no.ge.keys()))]
 
     @not_operational
@@ -507,6 +532,97 @@ class NsabaAnalysis(object):
         ttest_metrics['results'] = gene_stats
         return ttest_metrics
 
+    @preprint('This may take a couple of minutes ...')
+    def ge_term_ttest_multi(self, entrez, split_method='quant', sample_num=None, **kwargs):
+        """
+        Performs t-test equivalent to ge_term_t_test() across a subsample of term IDs
+        loaded into self.no. Default is to use all loaded Entrez ID genes.
+
+        Parameters
+        ----------
+        term : str
+
+        split_method : str, optional
+            OPTIONS:
+                'quant' : Quantile based split; i.e: default is 85/15 to control/functional.
+                'kmeans' : k-means, k=2.
+                'mog' : Mixture model (Gaussian), with 2 mixing components.
+
+        sample_num : int, optional
+
+        kwargs : dict
+            OPTIONS:
+                'genes_of_interest' : list
+                'nih_only' : bool
+                'gi_csv_path' : str
+            PASSED:
+                _split_mask()
+
+
+        Returns
+        -------
+        ttest_metrics : dict
+            Contains meta-information and results of multi-gene t-tests.
+            See below for construction.
+
+        """
+        # Setting contingency variables
+        if entrez not in self.no.ge:
+            raise ValueError("Gene estimation not generated for '%s" % gene)
+        if sample_num == None:
+            sample_num = len(self.no.term.keys())
+        elif sample_num <= 0:
+            raise ValueError("'sample_num' parameter must be greater than 0")
+        if 'terms_of_interest' not in kwargs:
+            kwargs['terms_of_interest'] = []
+
+        if len(self.no.term) < sample_num:
+            raise ValueError("Sample number exceeds stored number of terms")
+
+        # Use parameters nih_only=True and use gi_csv_path='..' to specify path to 'gene_info.csv'
+        sam_ids = random.sample(self.no.term.keys(), sample_num)
+
+        # Fetching GE/NS activation matrix
+        matrix = self.no.matrix_builder([sam_ids], [entrez])
+
+        non_nans = []
+        for ind, row in enumerate(matrix):
+            if not any(np.isnan(row)):
+                non_nans.append(ind)
+
+        matrix = matrix[non_nans]
+
+        ge_mat = matrix.T[:-1]
+        term_act_vector = matrix.T[-1:][0]
+
+        mask = self._split_mask(term_act_vector, method=split_method, **kwargs)
+
+        # Prepping ttest_metrics results dictionary
+        ttest_metrics = {'term': term, 'split_method': split_method, "term_sample_size": sample_num}
+        if split_method == 'quant':
+            if 'quant' in kwargs:
+                ttest_metrics['quant'] = kwargs['quant']
+            else:
+                ttest_metrics['quant'] = self.default_quant
+
+        gene_stats = []
+        for eid, ge in zip(sam_ids, ge_mat):
+            # Split coordinates in to term and non-term groups
+            cont_grp, funct_grp = self._split_groups(ge, mask)
+            test_stats = stats.ttest_ind(cont_grp, funct_grp)
+            d = cohen_d(cont_grp, funct_grp, len(cont_grp), len(funct_grp))
+            # One-sided T-Test
+            if test_stats[0] <= 0:
+                gene_stats.append(self.gene_rec(eid, d, test_stats[1]))
+            else:
+                continue
+            if eid in kwargs['genes_of_interest']:
+                print 'Gene: ' + str(eid) + '  Effect Size: '+str(d)
+        # Sort effect sizes from greatest to smallest in magnitude
+        gene_stats.sort(key=lambda rec: rec.cohen_d)
+        ttest_metrics['results'] = gene_stats
+        return ttest_metrics
+
     def fetch_gene_descriptions(self, metrics, coeff='cohen', nih_fetch_num=20, alpha=.05, **kwargs):
         """
         Uses ttest_metrics dictionary returned by term_ge_ttest_multi() or list of
@@ -625,7 +741,7 @@ class NsabaAnalysis(object):
         plt.xlabel('p-values')
         plt.ylabel('frequency')
 
-    def rho_distr(self, r_values, genes_of_interest=None):
+    def rho_distr_ge(self, r_values, genes_of_interest=None):
         """Visualizing effect-size distribution (Spearman's Rho)"""
 
         if genes_of_interest is None:
@@ -645,6 +761,7 @@ class NsabaAnalysis(object):
                                  [r_values[r], offsetter])
                     if genes_of_interest != []:
                         offsetter += 500/len(genes_of_interest)
+
 
     def cohen_d_distr(self, ttest_metrics, genes_of_interest=None, return_fig=False):
         """Visualizing effect-size distribution (Cohen's d)"""
