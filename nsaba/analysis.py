@@ -47,6 +47,7 @@ class NsabaAnalysis(object):
             raise ValueError("NsabaAnalysis() parameter not a Nsaba instance")
 
         self.gene_rec = collections.namedtuple("gene_rec", "entrez cohen_d p_value")
+        self.term_rec = collections.namedtuple("term_rec", "term cohen_d p_value")
         self.default_quant = 85
         print "To use inline plotting functionality in Jupyter, '%matplotlib inline' must be enabled"
 
@@ -583,7 +584,7 @@ class NsabaAnalysis(object):
         sam_ids = random.sample(self.no.term.keys(), sample_num)
 
         # Fetching GE/NS activation matrix
-        matrix = self.no.matrix_builder([sam_ids], [entrez])
+        matrix = self.no.matrix_builder(sam_ids, [entrez])
 
         non_nans = []
         for ind, row in enumerate(matrix):
@@ -592,35 +593,32 @@ class NsabaAnalysis(object):
 
         matrix = matrix[non_nans]
 
-        ge_mat = matrix.T[:-1]
-        term_act_vector = matrix.T[-1:][0]
+        term_mat = matrix.T[1:]
+        gene_act_vector = matrix.T[0]
 
-        mask = self._split_mask(term_act_vector, method=split_method, **kwargs)
-
+        mask = self._split_mask(gene_act_vector, method=split_method, **kwargs)
         # Prepping ttest_metrics results dictionary
-        ttest_metrics = {'term': term, 'split_method': split_method, "term_sample_size": sample_num}
+        ttest_metrics = {'Entrez': entrez, 'split_method': split_method, "term_sample_size": sample_num}
         if split_method == 'quant':
             if 'quant' in kwargs:
                 ttest_metrics['quant'] = kwargs['quant']
             else:
                 ttest_metrics['quant'] = self.default_quant
 
-        gene_stats = []
-        for eid, ge in zip(sam_ids, ge_mat):
-            # Split coordinates in to term and non-term groups
-            cont_grp, funct_grp = self._split_groups(ge, mask)
+        term_stats = []
+        for tid, term in zip(sam_ids, term_mat):
+            # Split coordinates in to gene and non-gene groups
+            cont_grp, funct_grp = self._split_groups(term, mask)
             test_stats = stats.ttest_ind(cont_grp, funct_grp)
             d = cohen_d(cont_grp, funct_grp, len(cont_grp), len(funct_grp))
             # One-sided T-Test
-            if test_stats[0] <= 0:
-                gene_stats.append(self.gene_rec(eid, d, test_stats[1]))
-            else:
-                continue
-            if eid in kwargs['genes_of_interest']:
-                print 'Gene: ' + str(eid) + '  Effect Size: '+str(d)
+            term_stats.append(self.term_rec(tid, d, test_stats[1]))
+
+            if tid in kwargs['terms_of_interest']:
+                print 'Term: ' + tid + '  Effect Size: '+str(d)
         # Sort effect sizes from greatest to smallest in magnitude
-        gene_stats.sort(key=lambda rec: rec.cohen_d)
-        ttest_metrics['results'] = gene_stats
+        term_stats.sort(key=lambda rec: rec.cohen_d)
+        ttest_metrics['results'] = term_stats
         return ttest_metrics
 
     def fetch_gene_descriptions(self, metrics, coeff='cohen', nih_fetch_num=20, alpha=.05, **kwargs):
@@ -762,8 +760,7 @@ class NsabaAnalysis(object):
                     if genes_of_interest != []:
                         offsetter += 500/len(genes_of_interest)
 
-
-    def cohen_d_distr(self, ttest_metrics, genes_of_interest=None, return_fig=False):
+    def gene_cohen_d_distr(self, ttest_metrics, genes_of_interest=None, return_fig=False):
         """Visualizing effect-size distribution (Cohen's d)"""
 
         if genes_of_interest is None:
@@ -772,7 +769,7 @@ class NsabaAnalysis(object):
         d_vals = [rec.cohen_d for rec in ttest_metrics['results']]
         ax = plt.axes()
         ax.hist(d_vals, bins=75)
-        ax.set_title("Effect Size Distribution (Cohen's d)")
+        ax.set_title("Effect Size Distribution (Cohen's d) of " + ttest_metrics['term'])
         ax.set_xlabel('effect sizes')
         ax.set_ylabel('frequency')
 
@@ -784,7 +781,32 @@ class NsabaAnalysis(object):
                 plt.annotate('Gene:'+str(int(rec.entrez))+' d='+str(rec.cohen_d),
                              [rec.cohen_d, offsetter])
                 if genes_of_interest != []:
-                    offsetter += 450/len(genes_of_interest)
+                    offsetter += 425/len(genes_of_interest)
+        if return_fig:
+            return ax
+
+    def term_cohen_d_distr(self, ttest_metrics, terms_of_interest=None, return_fig=False):
+        """Visualizing effect-size distribution (Cohen's d)"""
+
+        if terms_of_interest is None:
+            terms_of_interest = []
+
+        d_vals = [rec.cohen_d for rec in ttest_metrics['results']]
+        ax = plt.axes()
+        ax.hist(d_vals, bins=75)
+        ax.set_title("Effect Size Distribution (Cohen's d) of gene #" + str(ttest_metrics['Entrez']))
+        ax.set_xlabel('effect sizes')
+        ax.set_ylabel('frequency')
+
+        if terms_of_interest != []:
+            offsetter = 450/len(terms_of_interest)
+        for rec in ttest_metrics['results']:
+            if rec.term in terms_of_interest:
+                plt.plot([rec.cohen_d, rec.cohen_d], [0, offsetter])
+                plt.annotate(rec.term +' d='+str(rec.cohen_d),
+                             [rec.cohen_d, offsetter])
+                if terms_of_interest != []:
+                    offsetter += 425/len(terms_of_interest)
         if return_fig:
             return ax
 

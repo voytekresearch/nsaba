@@ -208,7 +208,7 @@ class NsabaVisualizer(object):
                     ax.set_xlabel(str(gene))
                     ax.set_ylabel(term)
                     if verbose == True:
-                        print 'correlation: r=' + str(r) + ' p='+str(p) + '\n'
+                        print 'correlation: r=' + str(r[1]) + '\n'
                         print 'linear regression: m=' + str(m) + ' c=' + str(c)
                     return [r, p], [m, c]
                 else:
