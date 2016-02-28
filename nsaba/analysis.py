@@ -342,11 +342,18 @@ class NsabaAnalysis(object):
         """
         if entrez not in self.no.ge:
             raise ValueError("Gene estimation not generated for '%s" % entrez)
-        ge_mat = self.no.matrix_builder([self.no.term.keys()], self.no.ge[entrez])
+        ge_mat = self.no.matrix_builder(self.no.term.keys(), [entrez])
+
+        non_nans = []
+        for ind, row in enumerate(ge_mat):
+            if not any(np.isnan(row)):
+                non_nans.append(ind)
+
+        ge_mat = ge_mat[non_nans]
 
         # Calculates Spearman's Rho on all terms for a given gene
-        return [stats.spearmanr(ge_mat[:, ge_mat.shape[1]-1], ge_mat[:, r])[0]  # fix me
-                for r in xrange(len(self.no.ge.keys()))]
+        return [stats.spearmanr(ge_mat[:, 0], ge_mat[:, r+1])[0]
+                for r in xrange(len(self.no.term.keys()))]
 
     @not_operational
     def t_test_custom_ge(self, coords1, coords2, gene, quant=None, log=False, graphops='density'):
@@ -739,7 +746,7 @@ class NsabaAnalysis(object):
         plt.xlabel('p-values')
         plt.ylabel('frequency')
 
-    def rho_distr_ge(self, r_values, genes_of_interest=None):
+    def term_rho_distr_ge(self, r_values, genes_of_interest=None):
         """Visualizing effect-size distribution (Spearman's Rho)"""
 
         if genes_of_interest is None:
@@ -759,6 +766,26 @@ class NsabaAnalysis(object):
                                  [r_values[r], offsetter])
                     if genes_of_interest != []:
                         offsetter += 500/len(genes_of_interest)
+
+    def gene_rho_distr(self, r_values, terms_of_interest=None):
+        """Visualizing effect-size distribution (Spearman's Rho)"""
+
+        if terms_of_interest is None:
+            terms_of_interest = []
+        ax = plt.axes()
+        ax.hist(r_values, bins=75)
+        ax.set_title("Effect Size Distribution (Spearman's Rho)")
+        ax.set_xlabel("effect sizes")
+        ax.set_ylabel('frequency')
+
+        if terms_of_interest != []:
+            offsetter = 500/len(terms_of_interest)
+            for r in xrange(len(r_values)):
+                if self.no.term.keys()[r] in terms_of_interest:
+                    plt.plot([r_values[r], r_values[r]], [0, offsetter])
+                    plt.annotate(self.no.term.keys()[r]+' rho='+str(r_values[r]), [r_values[r], offsetter])
+                    if terms_of_interest != []:
+                        offsetter += 500/len(terms_of_interest)
 
     def gene_cohen_d_distr(self, ttest_metrics, genes_of_interest=None, return_fig=False):
         """Visualizing effect-size distribution (Cohen's d)"""
