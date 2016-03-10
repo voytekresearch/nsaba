@@ -184,6 +184,7 @@ class Nsaba(NsabaBase):
         self.term = {}
         self.ns_weight_f = lambda r: 1. / np.power(r, 2)
         self._gaussian_weight_radius = 5
+        self._FWHM = 0
 
     def get_ns_struct(self, key=None):
         """
@@ -267,13 +268,16 @@ class Nsaba(NsabaBase):
         """custom function to weight distance by gaussian smoothing"""
         radius = self._gaussian_weight_radius
         radius_gaussian = signal.gaussian(radius*2+1, radius/2.0, sym=True)
+        m = min(range(len(radius_gaussian)), key=lambda i: abs(radius_gaussian[i]-.5))
+        self._FWHM = 2*(((len(radius_gaussian)/2)+1)-m)  # full width half maximum
+
         rad_fit_to_gaussian = radius_gaussian[radius:radius+radius+1]
         weights = []
         for ele in estimation_distances:
             weights.append([rad_fit_to_gaussian[int(rad_i)] for rad_i in ele])
         return weights
 
-    def estimate_aba_ge(self, entrez_ids, coords=None, save_classifier=False,**kwargs):
+    def estimate_aba_ge(self, entrez_ids, coords=None, save_classifier=False, **kwargs):
         """
         Retrieves, estimates and stores gene expression coefficients in ABA dictionary based on a
         a passed list of NIH Entrez IDs.

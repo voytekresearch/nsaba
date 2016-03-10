@@ -111,8 +111,8 @@ def get_local_gene_info(path, gene_ids):
     df = load_gene_file(path)
     output = []
     for gene_id in gene_ids:
-        if gene_id in df['Entrez']:
-            gi = df[df['Entrez'] == gene_id].as_matrix()[0]
+        if gene_id in df['Entrez'].as_matrix():
+            gi = df[df['Entrez'].as_matrix() == gene_id].as_matrix()[0]
             output.append(gi_tuple(gi[0], gi[1], gi[2]))
         else:
             print 'Gene %s not found in NIH database' % gene_id
