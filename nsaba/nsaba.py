@@ -50,12 +50,17 @@ class NsabaBase(object):
         'exp_df': None,
         'probe_df': None,
         'si_df': None,
-        'mni_coords': None
+        'mni_coords': None,
     }
 
     _ns = {
         'database_df': None,
         'features_df': None,
+    }
+
+    _cus = {
+        'mni_coords': None,
+        'custom_vals': None,
     }
 
     @classmethod
@@ -158,6 +163,30 @@ class NsabaBase(object):
                                              np.floor(cls._ns['database_df']['y'].iloc[c]),
                                              np.floor(cls._ns['database_df']['z'].iloc[c])))
                 c += 1
+
+    @classmethod
+    def custom_load(cls, custom_coords, custom_vals):
+        """
+        Loads custom data into Nsaba
+
+        Parameters
+        ----------
+        custom_coords : string
+                path to csv containing 3xN matrix of x,y,z coordinates of custom data to input into Nsaba object.
+                Coordinates are expected to be in MNI space.
+
+        custom_vals : string
+                path to csv containing 1xN vector of values corresponding to x,y,z coordinates above.
+        """
+        cls._check_static_members()
+
+        df = pd.read_table(custom_coords)
+        mni_coords = df.as_matrix().astype(float)
+        cls._ns['mni_coords'] = spatial.KDTree(mni_coords)
+
+        cls._cus['mni_coords'] = []
+        cls._cus['custom_vals'] = []
+
 
     @classmethod
     def _check_static_members(self):
