@@ -917,7 +917,7 @@ class NsabaAnalysis(object):
                 random_gene_output.append(m, c)
             return real_gene_output, random_gene_output
 
-    def gp_ns_ge(self, term, gene, logy=False, logx=False, figsize=(4,5), only_term=False, **kwargs):
+    def gp_ns_ge(self, term, gene, logy=False, logx=False, only_term=False, **kwargs):
         """
         Fits Gaussian process to gene expression predictor of term activation.
         Choice of covariance kernel and hyperparameters can be passed via **kwargs.
@@ -997,8 +997,7 @@ class NsabaAnalysis(object):
 
                 plt.xlabel(str(gene))
                 plt.ylabel(term)
-                plt.figure(figsize=figsize)
-                return plt.figure
+
 
             else:
                 raise ValueError("Term '%s' has not been initialized. Use get_ns_act('%s')" % term)
