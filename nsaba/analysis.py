@@ -496,7 +496,7 @@ class NsabaAnalysis(object):
                     df = load_gene_file(gi_path)
                 else:
                     df = load_gene_file()
-                nih_ids = df['entrez'].as_matrix()
+                nih_ids = df['Entrez'].as_matrix()
                 sam_ids = [entrez_id for entrez_id in nih_ids if entrez_id in nih_ids]
                 print "Using NIH described genes only; Entrez ID sample size now %d" % (len(sam_ids))
 
@@ -530,10 +530,8 @@ class NsabaAnalysis(object):
             test_stats = stats.ttest_ind(cont_grp, funct_grp)
             d = cohen_d(cont_grp, funct_grp, len(cont_grp), len(funct_grp))
             # One-sided T-Test
-            if test_stats[0] <= 0:
-                gene_stats.append(self.gene_rec(eid, d, test_stats[1]))
-            else:
-                continue
+            gene_stats.append(self.gene_rec(eid, d, test_stats[1]))
+
             if eid in kwargs['genes_of_interest']:
                 print 'Gene: ' + str(eid) + '  Effect Size: '+str(d)
         # Sort effect sizes from greatest to smallest in magnitude

@@ -172,5 +172,6 @@ def fetch_entrez_ids(term, id_num):
         print (entrez_ids[-1])
 
     driver.close()
+    driver.quit()
 
     return entrez_ids
