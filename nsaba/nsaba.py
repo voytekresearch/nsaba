@@ -363,7 +363,8 @@ class Nsaba(NsabaBase):
             else:
                 X = self._aba['mni_coords'].data
                 y_mean = ge_vec
-                valid_inds = self._check_coords_for_distance_weighting(coords=coords, check_radius=kwargs['rnn_args']['radius'], check_weights='distance', X=X, y_mean=y_mean)
+                valid_inds = self._check_coords_for_distance_weighting(coords=coords, check_radius=kwargs['rnn_args']['radius'],
+                                                                       check_weights='distance', X=X, y_mean=y_mean)
 
                 if 'rnn_args' in kwargs:
                     if 'radius' not in kwargs['rnn_args']:
