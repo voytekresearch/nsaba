@@ -33,7 +33,7 @@ def cohen_d(x1, x2, n1, n2):
     Computes Cohen's d; an effect size statistic:
     Overview: https://en.wikipedia.org/wiki/Effect_size#Cohen.27s_d
     """
-    return (np.mean(x1) - np.mean(x2)) / np.sqrt(((n1-1)*np.var(x1) + (n2-1)*np.var(x2)) / (n1 + n2-2))
+    return (np.mean(x2) - np.mean(x1)) / np.sqrt(((n1-1)*np.var(x1) + (n2-1)*np.var(x2)) / (n1 + n2-2))  #cohen's d is now positive
 
 
 class NsabaAnalysis(object):
@@ -49,6 +49,10 @@ class NsabaAnalysis(object):
 
         self.gene_rec = collections.namedtuple("gene_rec", "entrez cohen_d p_value")
         self.term_rec = collections.namedtuple("term_rec", "term cohen_d p_value")
+        self.gene_rec_spearman = collections.namedtuple("gene_rec", "term r_value")
+        self.term_rec_spearman = collections.namedtuple("term_rec", "entrez r_value")
+        self.gene_rec_pearson = collections.namedtuple("gene_rec", "term r_value p_value")
+        self.term_rec_pearson = collections.namedtuple("term_rec", "entrez r_value p_value")
         self.default_quant = 85
         print "To use inline plotting functionality in Jupyter, '%matplotlib inline' must be enabled"
 
@@ -300,7 +304,7 @@ class NsabaAnalysis(object):
 
 
     @preprint('This may take a couple of minutes ...')
-    def term_ge_spearman_rho(self, term):
+    def term_ge_spearman_rho(self, term, sample_num=None, *kwargs):
         """"
         Calculates Spearman's Rho for each across all genes for a given term.
 
@@ -318,11 +322,47 @@ class NsabaAnalysis(object):
         """
         if term not in self.no.term:
             raise ValueError("Term activation not generated for '%s" % term)
-        ge_mat = self.no.matrix_builder([term], self.no.ge.keys())
 
+        if sample_num == None:
+            sample_num = len(self.no.ge.keys())
+
+        sam_ids = random.sample(self.no.ge.keys(), sample_num)
+
+        spearman_metrics = {'term': term, "gene_sample_size": sample_num}
+
+        # Use parameters nih_only=True and use gi_csv_path='..' to specify path to 'gene_info.csv'
+        if 'nih_only' in kwargs:
+            if kwargs['nih_only']:
+                if 'gi_csv_path' in kwargs:
+                    gi_path = kwargs['gi_csv_path']
+                    df = load_gene_file(gi_path)
+                else:
+                    df = load_gene_file()
+                nih_ids = df['Entrez'].as_matrix()
+                sam_ids = [entrez_id for entrez_id in nih_ids if entrez_id in nih_ids]
+                print "Using NIH described genes only; Entrez ID sample size now %d" % (len(sam_ids))
+
+        ge_mat = self.no.matrix_builder([term], sam_ids)
+
+        non_nans = []
+        for ind, row in enumerate(ge_mat):
+            if not any(np.isnan(row)):
+                non_nans.append(ind)
+
+        ge_mat = ge_mat[non_nans]
         # Calculates Spearman's Rho for each across all genes for a given term
-        return [stats.spearmanr(ge_mat[:, ge_mat.shape[1]-1], ge_mat[:, r])[0]
-                for r in xrange(len(self.no.ge.keys()))]
+        spearman_vals = [stats.spearmanr(ge_mat[:, ge_mat.shape[1]-1], ge_mat[:, r])[0] for r in xrange(len(sam_ids))]
+
+
+        term_stats = []
+        for entrez in xrange(len(sam_ids)):
+            term_stats.append(self.term_rec_spearman(sam_ids[entrez], spearman_vals[entrez]))
+
+        # Sort effect sizes from greatest to smallest in magnitude
+        term_stats.sort(key=lambda rec: rec.r_value)
+        spearman_metrics['results'] = term_stats
+
+        return spearman_metrics
 
     @preprint('This may take a couple of minutes ...')
     def ge_term_spearman_rho(self, entrez):
@@ -355,6 +395,66 @@ class NsabaAnalysis(object):
         # Calculates Spearman's Rho on all terms for a given gene
         return [stats.spearmanr(ge_mat[:, 0], ge_mat[:, r+1])[0]
                 for r in xrange(len(self.no.term.keys()))]
+
+    @preprint('This may take a couple of minutes ...')
+    def term_ge_pearson(self, term, sample_num=None, *kwargs):
+        """"
+        Calculates Pearson's r and p for each across all genes for a given term.
+
+        Parameters
+        ----------
+        term : str
+            NS term of interest
+
+        Returns
+        -------
+        list : [ len(ge.keys()) ]
+            Returns a list of Pearson coefficients corresponding to the Pearson
+            correlation between term activation for 'term' and gene expression for
+            all genes loaded into the base Nsaba object.
+        """
+        if term not in self.no.term:
+            raise ValueError("Term activation not generated for '%s" % term)
+
+        if sample_num == None:
+            sample_num = len(self.no.ge.keys())
+
+        sam_ids = random.sample(self.no.ge.keys(), sample_num)
+        pearson_metrics = {'term': term, "gene_sample_size": sample_num}
+
+        # Use parameters nih_only=True and use gi_csv_path='..' to specify path to 'gene_info.csv'
+        if 'nih_only' in kwargs:
+            if kwargs['nih_only']:
+                if 'gi_csv_path' in kwargs:
+                    gi_path = kwargs['gi_csv_path']
+                    df = load_gene_file(gi_path)
+                else:
+                    df = load_gene_file()
+                nih_ids = df['Entrez'].as_matrix()
+                sam_ids = [entrez_id for entrez_id in nih_ids if entrez_id in nih_ids]
+                print "Using NIH described genes only; Entrez ID sample size now %d" % (len(sam_ids))
+
+        ge_mat = self.no.matrix_builder([term], sam_ids)
+
+        non_nans = []
+        for ind, row in enumerate(ge_mat):
+            if not any(np.isnan(row)):
+                non_nans.append(ind)
+
+        ge_mat = ge_mat[non_nans]
+
+        # Calculates Pearson's Rho for each across all genes for a given term
+        term_stats = []
+        for entrez in xrange(len(sam_ids)):
+            r, p = stats.pearsonr(ge_mat[:, ge_mat.shape[1]-1], ge_mat[:, entrez])
+
+            term_stats.append(self.term_rec_pearson(sam_ids[entrez], r, p))
+
+        # Sort effect sizes from greatest to smallest in magnitude
+        term_stats.sort(key=lambda rec: rec.r_value)
+        pearson_metrics['results'] = term_stats
+
+        return pearson_metrics
 
     @not_operational
     def t_test_custom_ge(self, coords1, coords2, gene, quant=None, log=False, graphops='density'):

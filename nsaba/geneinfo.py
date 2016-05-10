@@ -175,3 +175,54 @@ def fetch_entrez_ids(term, id_num):
     driver.quit()
 
     return entrez_ids
+
+
+def fetch_gifts_score(term, id_num):
+    """
+    Returns Entrez IDs of genes most strongly associated a term from
+    www.genecard.org.
+
+    Parameters
+    ----------
+    term : str
+        Term for
+
+    id_num : str/int
+        The number of highest scored Entrez IDs for the specified term.
+
+    Returns
+    -------
+    entrez_ids : list
+        A list of 'id_num' top Entrez IDs associated with 'term'.
+    """
+    entrez_ids = []
+    strs = ["http://www.genecards.org/Search/Keyword?startPage=0&queryString=",
+            term, "&pageSize=", str(id_num)]
+    search_url = ''.join(strs)
+    driver = webdriver.PhantomJS()
+    driver.get(search_url)
+    print (search_url)
+    try:
+        # Waits for DOM to render the search results table before accessing elements.
+        check = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.ID, "searchResults")))
+    finally:
+        search_table = driver.find_element_by_id("searchResults")
+
+    top_genes = search_table.find_elements_by_class_name("td")
+
+    gene_urls = []
+    for gene in top_genes:
+        el = gene.find_element_by_tag_name("a")
+        gene_urls.append(el.get_attribute("href"))
+
+
+
+        result = re.search("Entrez\sGene:\s([0-9]*)", text)
+        entrez_ids.append(result.group(1))
+        print (entrez_ids[-1])
+
+    driver.close()
+    driver.quit()
+
+    return entrez_ids
