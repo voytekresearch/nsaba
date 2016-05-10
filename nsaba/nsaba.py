@@ -276,23 +276,6 @@ class Nsaba(NsabaBase):
             if isinstance(entrez_ids, str):
                 raise TypeError("Invalid parameter form; please contain entrez ids in iterable container")
 
-    def _check_coords_for_distance_weighting(self, coords, check_radius, check_weights, X, y_mean):
-        """
-        Checks that coords won't break the distance weighting function
-
-        """
-        valid_inds = []
-        for coord in xrange(len(coords)):
-
-            temp = RadiusNeighborsRegressor(radius=check_radius, weights=check_weights)
-            temp.fit(X, y_mean)
-            try:
-                temp.predict([coords[coord]])
-                valid_inds.append(coord)
-            except ZeroDivisionError:
-                continue
-        return valid_inds
-
     def _gaussian_weight_function(self, estimation_distances):
         """custom function to weight distance by gaussian smoothing"""
         radius = self._gaussian_weight_radius
@@ -363,8 +346,6 @@ class Nsaba(NsabaBase):
             else:
                 X = self._aba['mni_coords'].data
                 y_mean = ge_vec
-                valid_inds = self._check_coords_for_distance_weighting(coords=coords, check_radius=kwargs['rnn_args']['radius'], check_weights='distance', X=X, y_mean=y_mean)
-
                 if 'rnn_args' in kwargs:
                     if 'radius' not in kwargs['rnn_args']:
                         kwargs['rnn_args']['radius'] = 5
@@ -397,20 +378,27 @@ class Nsaba(NsabaBase):
 
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
-                    nan_array = np.empty(len(coords))
-                    nan_array[:] = np.nan
+                    nan_array_probe = np.empty(len(coords))
+                    nan_array_probe[:] = np.nan
                     for row, probe in enumerate(probe_ids):
-                        self.ge[entrez_id][probe]["GE"] = nan_array
-                        if len(valid_inds) > 0:
-                            estimations = probe_classifier.predict([coords[i] for i in valid_inds])
-                            for vi in xrange(len(valid_inds)):
-                                self.ge[entrez_id][probe]["GE"][valid_inds[vi]] = estimations[vi]
+                        for i, coord in enumerate(coords):
+                            try:
+                                nan_array_probe[i] = probe_classifier.predict(coord)
+                            except ZeroDivisionError:
+                                continue
+                        self.ge[entrez_id][probe]["GE"] = nan_array_probe
 
-                    self.ge[entrez_id]["mean"]["GE"] = nan_array
-                    if len(valid_inds) > 0:
-                        estimations = gene_classifier.predict([coords[i] for i in valid_inds])
-                        for vi in xrange(len(valid_inds)):
-                            self.ge[entrez_id]["mean"]["GE"][vi] = estimations[vi]
+                    nan_array_gene = np.empty(len(coords))
+                    nan_array_gene[:] = np.nan
+
+                    for i, coord in enumerate(coords):
+                        try:
+                            nan_array_gene[i] = gene_classifier.predict(coord)
+                        except ZeroDivisionError:
+                            continue
+
+                    self.ge[entrez_id]["mean"]["GE"] = nan_array_gene
+
                 if save_classifier is True:
                     self.ge[entrez_id][probe]['classifier'] = probe_classifier
                     self.ge[entrez_id]["mean"]['classifier'] = gene_classifier
@@ -712,7 +700,7 @@ class Nsaba(NsabaBase):
             term_ids_act.rename(columns={'pmid': 'id'}, inplace=True)
             return ns_coord_tree, term_coords.merge(term_ids_act)
 
-    def estimate_ns_act(self, term, coords=None, save_classifier=False, **kwargs):
+    def estimate_ns_act(self, terms, coords=None, save_classifier=False, **kwargs):
         """
         Uses KNN to estimate Neurosynth term activation (tf-idf) at
         specified coordinates. If no coordinates are passed, ABA sampled
@@ -721,7 +709,7 @@ class Nsaba(NsabaBase):
         Parameters
         ----------
         term : str
-            NS term whose activation is to be estimated
+            NS terms whose activation is to be estimated
 
         coords : np.array [int], optional
             Coordinates where NS term activation is to be estimated.
@@ -733,38 +721,54 @@ class Nsaba(NsabaBase):
                     for default arguments.
 
         """
-        if not self.is_term(term):
-            raise ValueError("'%s' is not a registered term." % term)
+        for term in terms:
+            if not self.is_term(term):
+                raise ValueError("'%s' is not a registered term." % term)
 
-        self.term[term] = {}
+            self.term[term] = {}
 
-        if coords is None:
-            coords = self._aba['mni_coords'].data
-            self.term[term]['coord_type'] = 'ABA MNI'
-        else:
-            self.term[term]['coords'] = coords
-            if 'coord_type' in kwargs:
-                self.term[term]['coord_type'] = kwargs['coord_type']
+            if coords is None:
+                coords = self._aba['mni_coords'].data
+                self.term[term]['coord_type'] = 'ABA MNI'
+            else:
+                self.term[term]['coords'] = coords
+                if 'coord_type' in kwargs:
+                    self.term[term]['coord_type'] = kwargs['coord_type']
 
-        ns_coord_tree, ns_coord_act_df = self._term_to_coords(term, 0)
+            ns_coord_tree, ns_coord_act_df = self._term_to_coords(term, 0)
 
-        if 'rnn_args' in kwargs:
-            if 'radius' not in kwargs['rnn_args']:
-                kwargs['rnn_args']['radius'] = 5
-            classifier = RadiusNeighborsRegressor(**kwargs['rnn_args'])
-        else:
-            classifier = RadiusNeighborsRegressor(radius=5)
+            if 'rnn_args' in kwargs:
+                if 'radius' not in kwargs['rnn_args']:
+                    kwargs['rnn_args']['radius'] = 5
+                if 'radius' in kwargs['rnn_args']:
+                    if kwargs['rnn_args']['radius'] == 1:
+                        kwargs['weights'] = 'uniform'
+                if 'weights' not in kwargs['rnn_args']:
+                    kwargs['weights'] = 'uniform'
+                if 'weights' != 'distance':
+                    self._gaussian_weight_radius = kwargs['rnn_args']['radius']
 
-        X = ns_coord_tree.data
-        y = ns_coord_act_df[term].as_matrix()
+                classifier = RadiusNeighborsRegressor(**kwargs['rnn_args'])
+            else:
+                classifier = RadiusNeighborsRegressor(radius=5)
 
-        classifier.fit(X, y)
+            X = ns_coord_tree.data
+            y = ns_coord_act_df[term].as_matrix()
+            classifier.fit(X, y)
+            nan_array = np.empty(len(coords))
+            nan_array[:] = np.nan
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            self.term[term]['act'] = classifier.predict(coords)
-        if save_classifier is True:
-            self.term[term]['classifier'] = classifier
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                for i, coord in enumerate(coords):
+                    try:
+                        nan_array[i] = classifier.predict(coord)
+                    except ZeroDivisionError:
+                        continue
+                self.term[term]["act"] = nan_array
+
+            if save_classifier is True:
+                self.term[term]['classifier'] = classifier
 
     def pickle_ns(self, pkl_file="Nsaba_NS_act.pkl", output_dir='.'):
         """
