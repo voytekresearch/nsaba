@@ -19,6 +19,7 @@ import pandas as pd
 from scipy import stats
 from sklearn.cluster import KMeans
 from sklearn import mixture
+from sklearn.gaussian_process import GaussianProcess
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
@@ -389,7 +390,7 @@ class NsabaAnalysis(object):
             ax.violinplot([ge1, ge2])
             ax.set_xticks([1, 2])
             ax.set_xticklabels(['coordinate list 1', 'coordinate list 2'])
-            ax.set_ylabel('Gene Expression')
+            ax.set_ylabel('Gene Expression: %d' % gene)
             ax.plot(np.ones(len(ge1)), ge1, 'b.')
             ax.plot(1, np.mean(ge1), 'bs')
             ax.plot(2*np.ones(len(ge2)), ge2, 'g.')
@@ -915,6 +916,253 @@ class NsabaAnalysis(object):
                 m, c = np.linalg.lstsq(X, np.log(ge_ns_mat[:, 1]))[0]
                 random_gene_output.append(m, c)
             return real_gene_output, random_gene_output
+
+    def gp_ns_ge(self, term, gene, logy=False, logx=False, only_term=False, **kwargs):
+        """
+        Fits Gaussian process to gene expression predictor of term activation.
+        Choice of covariance kernel and hyperparameters can be passed via **kwargs.
+
+        Parameters
+        ----------
+        term : str
+            NS term to be linearly correlated/predicted with a given gene's
+            gene expression.
+
+        gene : str
+            Entrez ID of gene whose gene expression is to be used as
+            a linear predictor of term activation.
+
+        logy : bool
+            log-space of y-axis.
+
+        logx : bool
+            log-space of x-axis.
+
+        kwargs : dict
+            See: http://scikit-learn.org/stable/modules/generated/sklearn.gaussian_process.GaussianProcess.html
+            For valid hyperparameters and covariance function values.
+
+        """
+        if gene in self.no.ge:
+            if term in self.no.term:
+                ge_ns_mat = self.no.matrix_builder([term], [gene])
+                if only_term:
+                    if ge_ns_mat.shape[0] > 900:  # check this num later
+                        print 'reinitializing ' + term + ' for hacky plotting method'
+                        self.no.est_ns_act(term, radius=10)
+                        ge_ns_mat = self.no.matrix_builder([term], gene)
+                if logy:
+                    plt.yscale('log')
+                if logx:
+                    plt.xscale('log')
+
+                # remove nans
+                valid1 = np.isfinite(ge_ns_mat[:, 0])
+                valid2 = np.isfinite(ge_ns_mat[:, 1])
+                valid_inds = np.logical_and(valid1, valid2)
+
+                X = ge_ns_mat[:,0][valid_inds]
+                y = ge_ns_mat[:,1][valid_inds]
+
+                # GP parameters
+
+                if 'corr' not in kwargs:
+                    kwargs['corr']  = 'squared_exponential'
+                if 'theta0' not in kwargs:
+                    kwargs['theta0'] = 1e-3
+                if 'thetaL' not in kwargs:
+                    kwargs['thetaL'] = 1e-4
+                if 'thetaU' not in kwargs:
+                    kwargs['thetaU'] = 1e-3
+                if 'random_start' not in kwargs:
+                    kwargs['random_start'] = 100
+                if 'nugget' in kwargs:
+                    kwargs['nugget'] = kwargs['nugget'](y)
+                else:
+                    kwargs['nugget'] = np.var(y)
+
+                # GP
+                gp = GaussianProcess(**kwargs)
+
+                gp.fit(X.reshape(-1, 1), y.reshape(-1, 1))
+
+                x = np.linspace(np.min(X), np.max(X), 5000)
+                y_pred, MSE = gp.predict(x.reshape(-1,1), eval_MSE=True)
+                sigma = np.sqrt(MSE)
+
+                plt.plot(x, y_pred, 'r-', label=u'$\hat{f}$', linewidth=2)
+                plt.plot(X,y, 'bo', ms=4, alpha=.3)
+                ci = np.squeeze(y_pred.reshape(1,-1))
+                plt.fill_between(x, ci - 1.9600 * sigma, ci + 1.9600 * sigma, alpha=.5, facecolor='red');
+
+                plt.xlabel(str(gene))
+                plt.ylabel(term)
+
+
+            else:
+                raise ValueError("Term '%s' has not been initialized. Use get_ns_act('%s')" % term)
+        else:
+            raise ValueError("Gene %s has not been initialized. "
+                             "Use self.no.get_aba_ge([%s])" % str(g))
+
+    def gp_ns_ns(self, term1, term2, logy=False, logx=False, **kwargs):
+        """
+        Fits Gaussian process to term activation predictor of term activation.
+        Choice of covariance kernel and hyperparameters can be passed via **kwargs.
+
+        Parameters
+        ----------
+        term1 : str
+            NS predictor term.
+
+        term2 : str
+            NS term to be linearly correlated/predicted with a predictor term's
+            term activation.
+
+        logy : bool
+            log-space of y-axis.
+
+        logx : bool
+            log-space of x-axis.
+
+        kwargs : dict
+            See: http://scikit-learn.org/stable/modules/generated/sklearn.gaussian_process.GaussianProcess.html
+            For valid hyperparameters and covariance function values.
+
+        """
+        if term1 in self.no.term:
+            if term2 in self.no.term:
+                if logy:
+                    plt.yscale('log')
+                if logx:
+                    plt.xscale('log')
+                # remove nans
+                valid1 = np.isfinite(self.no.term[term1]['act'])
+                valid2 = np.isfinite(self.no.term[term1]['act'])
+                valid_inds = np.logical_and(valid1, valid2)
+
+                X = self.no.term[term1]['act'][valid_inds]
+                y = self.no.term[term2]['act'][valid_inds]
+
+                # GP parameters
+
+                if 'corr' not in kwargs:
+                    kwargs['corr']  = 'squared_exponential'
+                if 'theta0' not in kwargs:
+                    kwargs['theta0'] = 1e-3
+                if 'thetaL' not in kwargs:
+                    kwargs['thetaL'] = 1e-4
+                if 'thetaU' not in kwargs:
+                    kwargs['thetaU'] = 1e-3
+                if 'random_start' not in kwargs:
+                    kwargs['random_start'] = 100
+                if 'nugget' in kwargs:
+                    kwargs['nugget'] = kwargs['nugget'](y)
+                else:
+                    kwargs['nugget'] = np.var(y)
+
+                # GP
+                gp = GaussianProcess(**kwargs)
+
+                # Implementation hiccup; measure against ill-conditioned covariance matrices
+                # See: https://github.com/scikit-learn/scikit-learn/issues/4916
+                X_ = (X + np.random.normal(0,1e-8, len(X))).reshape(-1,1)
+                gp.fit(X_, y)
+
+                x = np.linspace(np.min(X), np.max(X), 5000)
+                y_pred, MSE = gp.predict(x.reshape(-1,1), eval_MSE=True)
+                sigma = np.sqrt(MSE)
+
+                plt.plot(x, y_pred, 'r-', label=u'$\hat{f}$', linewidth=2)
+                plt.plot(X,y, 'bo', ms=4, alpha=.3)
+                ci = np.squeeze(y_pred.reshape(1,-1))
+                plt.fill_between(x, ci - 1.9600 * sigma, ci + 1.9600 * sigma, alpha=.5, facecolor='red');
+                cushion = (np.max(X)-np.min(X))/10.
+                plt.xlim(np.min(X)-cushion, np.max(X)+cushion)
+                plt.xlabel(term1)
+                plt.ylabel(term2)
+
+            else:
+                raise ValueError("Term '%s' has not been initialized. Use get_ns_act('%s')" % term2)
+        else:
+            raise ValueError("Term '%s' has not been initialized. Use get_ns_act('%s')" % term1)
+
+    def gp_ge_ge(self, gene1, gene2, **kwargs):
+        """
+        Fits Gaussian process to gene expression predictor of gene expression.
+        Choice of covariance kernel and hyperparameters can be passed via **kwargs.
+
+        Parameters
+        ----------
+        gene1 : str
+            Entrez ID of ABA predictor gene.
+
+        gene2 : str
+            Entrez ID of ABA gene to be linearly correlated/predicted with a predictor gene's
+            gene expression.
+
+        logy : bool
+            log-space of y-axis.
+
+        logx : bool
+            log-space of x-axis.
+
+        kwargs : dict
+            See: http://scikit-learn.org/stable/modules/generated/sklearn.gaussian_process.GaussianProcess.html
+            For valid hyperparameters and covariance function values.
+
+        """
+
+        genes = [gene1, gene2]
+
+        for gene in genes:
+            if gene not in self.no.ge:
+                raise ValueError("Gene %s has not been initialized. "
+                                 "Use self.no.get_aba_ge([%s])" % str(gene))
+
+        if len(self.no.ge[genes[0]]["mean"]['GE']) != len(self.no.ge[genes[1]]["mean"]['GE']):
+            raise ValueError("'GE' size mismatched rerun Nsaba.estimate_aba_ge() again.")
+
+        X = self.no.ge[genes[0]]["mean"]['GE']
+        y = self.no.ge[genes[1]]["mean"]['GE']
+
+        # GP parameters
+
+        if 'corr' not in kwargs:
+            kwargs['corr']  = 'squared_exponential'
+        if 'theta0' not in kwargs:
+            kwargs['theta0'] = 1e-3
+        if 'thetaL' not in kwargs:
+            kwargs['thetaL'] = 1e-4
+        if 'thetaU' not in kwargs:
+            kwargs['thetaU'] = 1e-3
+        if 'random_start' not in kwargs:
+            kwargs['random_start'] = 100
+        if 'nugget' in kwargs:
+            kwargs['nugget'] = kwargs['nugget'](y)
+        else:
+            kwargs['nugget'] = np.var(y)
+
+        # GP
+        gp = GaussianProcess(**kwargs)
+
+        # Implementation hiccup; measure against ill-conditioned covariance matrices
+        # See: https://github.com/scikit-learn/scikit-learn/issues/4916
+        X_ = (X + np.random.normal(0,1e-8, len(X))).reshape(-1,1)
+        gp.fit(X_, y)
+
+        x = np.linspace(np.min(X), np.max(X), 5000)
+        y_pred, MSE = gp.predict(x.reshape(-1,1), eval_MSE=True)
+        sigma = np.sqrt(MSE)
+
+        plt.plot(x, y_pred, 'r-', label=u'$\hat{f}$', linewidth=2)
+        plt.plot(X,y, 'bo', ms=4, alpha=.3)
+        ci = np.squeeze(y_pred.reshape(1,-1))
+        plt.fill_between(x, ci - 1.9600 * sigma, ci + 1.9600 * sigma, alpha=.5, facecolor='red');
+        cushion = (np.max(X)-np.min(X))/10.
+        plt.xlim(np.min(X)-cushion, np.max(X)+cushion)
+        plt.xlabel(gene1)
+        plt.ylabel(gene2)
 
 
 def load_gene_list(csv_path):
