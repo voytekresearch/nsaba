@@ -62,7 +62,7 @@ class NsabaVisualizer(object):
             fig = plt.figure(figsize=figsize)
             ax = fig.add_subplot(111, projection='3d')
             if z_score is True:
-                weights = (np.nan_to_num(no.term[term]['act'])-np.nanmean(self.no.term[term]['act']))/np.nanstd(self.no.term[term]['act'])
+                weights = (np.nan_to_num(self.no.term[term]['act'])-np.nanmean(self.no.term[term]['act']))/np.nanstd(self.no.term[term]['act'])
             else:
                 weights = np.nan_to_num(self.no.term[term]['act'])
             colors = cm.viridis(weights)
