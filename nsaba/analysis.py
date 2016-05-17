@@ -675,7 +675,7 @@ class NsabaAnalysis(object):
         """
         # Setting contingency variables
         if entrez not in self.no.ge:
-            raise ValueError("Gene estimation not generated for '%s" % gene)
+            raise ValueError("Gene estimation not generated for '%s'" % gene)
         if sample_num == None:
             sample_num = len(self.no.term.keys())
         elif sample_num <= 0:

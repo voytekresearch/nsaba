@@ -21,7 +21,7 @@ class NsabaVisualizer(object):
         else:
             raise ValueError("NsabaVisualizer() parameter not a Nsaba instance")
     
-    def visualize_ge(self, gene, alpha=0.4):
+    def visualize_ge(self, gene, alpha=0.4, figsize=(16, 10), z_score=True):
         """
         Generates 3-D heat map of gene expression for a specified gene.
 
@@ -33,27 +33,55 @@ class NsabaVisualizer(object):
         alpha : float
             Sets color density of coordinates used in heat map.
         """
-        for e in gene:
-            if e in self.no.ge:
-                fig = plt.figure()
-                ax = fig.add_subplot(111, projection='3d')
-                weights = self.no.ge[e]["mean"]['GE']
-                colors = cm.jet(weights/max(weights))
-                color_map = cm.ScalarMappable(cmap=cm.jet)
-                color_map.set_array(weights)
-                fig.colorbar(color_map)
-
-                x = self.no._aba['mni_coords'].data[:, 0]
-                y = self.no._aba['mni_coords'].data[:, 1]
-                z = self.no._aba['mni_coords'].data[:, 2]
-
-                ax.scatter(x, y, z, c=colors, alpha=alpha)
+        if gene in self.no.ge:
+            fig = plt.figure(figsize=figsize)
+            ax = fig.add_subplot(111, projection='3d')
+            if z_score is True:
+                weights = (self.no.ge[gene]["mean"]['GE']-self.no.ge[gene]["mean"]['GE'].mean())/self.no.ge[gene]["mean"]['GE'].std()
             else:
-                raise ValueError("Gene %s has not been initialized. "
-                                 "Use self.no.get_aba_ge([%s])" % str(e))
-        ax.set_title('Gene Expression of gene ID ' + str(gene))
+                weights = self.no.ge[gene]["mean"]['GE']
+            colors = cm.viridis(weights)
+            color_map = cm.ScalarMappable(cmap=cm.viridis)
+            color_map.set_array(weights)
+            fig.colorbar(color_map)
 
-    def visualize_ns(self, term, no_ids=10, alpha=0.2):
+            x = self.no._aba['mni_coords'].data[:, 0]
+            y = self.no._aba['mni_coords'].data[:, 1]
+            z = self.no._aba['mni_coords'].data[:, 2]
+
+            ax.scatter(x, y, z, c=colors, alpha=alpha)
+            ax.set_title('Gene Expression of gene ID ' + str(gene))
+            return fig
+        else:
+            raise ValueError("Gene %s has not been initialized. "
+                             "Use self.no.get_aba_ge([%s])" % str(e))
+
+    def visualize_ns(self, term, alpha=0.5, figsize=(16, 10), z_score=True):
+
+        if term in self.no.term:
+            fig = plt.figure(figsize=figsize)
+            ax = fig.add_subplot(111, projection='3d')
+            if z_score is True:
+                weights = (self.no.term[term]['act']-np.nanmean(self.no.term[term]['act']))/np.nanstd(self.no.term[term]['act'])
+            else:
+                weights = np.nan_to_num(self.no.term[term]['act'])
+            colors = cm.viridis(weights)
+            color_map = cm.ScalarMappable(cmap=cm.viridis)
+            color_map.set_array(weights)
+            fig.colorbar(color_map)
+
+            x = self.no._aba['mni_coords'].data[:, 0]
+            y = self.no._aba['mni_coords'].data[:, 1]
+            z = self.no._aba['mni_coords'].data[:, 2]
+
+            ax.scatter(x, y, z, c=colors, alpha=alpha)
+            ax.set_title('Map of ' + term)
+            return fig
+        else:
+            raise ValueError("Term %s has not been initialized. "
+                             "Use N.get_ns_act([%s])" % term)
+
+    def visualize_ns_all(self, term, no_ids=10, alpha=0.2, figsize=(16, 10), z_score=True):
         """
         Generates 3-D heat map of term activation for a specified term.
 
@@ -73,7 +101,7 @@ class NsabaVisualizer(object):
                 len(self.no._ns['id_dict'])
             except KeyError:
                 self.no.ns_load_id_dict()
-            heat = self.no._ns['features_df'][term]
+            heat = (self.no._ns['features_df'][term]-self.no._ns['features_df'][term].mean())/self.no._ns['features_df'][term].std()
             sorted_heat_vals = sorted(enumerate(heat), key=lambda x: x[1], reverse=True)[0:no_ids]
             weights = zip(*sorted_heat_vals)[1]
             inds = zip(*sorted_heat_vals)[0]
@@ -94,14 +122,15 @@ class NsabaVisualizer(object):
                     yvals.append(coord[1])
                     zvals.append(coord[2])
                     new_weights.append(weights[wc])
-            fig = plt.figure()
+            fig = plt.figure(figsize=figsize)
             ax = fig.add_subplot(111, projection='3d')
-            colors = cm.jet(new_weights/max(new_weights))
-            color_map = cm.ScalarMappable(cmap=cm.jet)
+            colors = cm.viridis(new_weights/max(new_weights))
+            color_map = cm.ScalarMappable(cmap=cm.viridis)
             color_map.set_array(new_weights)
             fig.colorbar(color_map)
             ax.scatter(xvals, yvals, zvals, c=colors, alpha=alpha)
             ax.set_title('Heat map of ' + str(term))
+            return fig
         else:
             raise ValueError("Term '%s' has not been initialized. Use get_ns_act('%s')" % term)
 
@@ -122,8 +151,8 @@ class NsabaVisualizer(object):
                     weights.append(self.no.coord_to_ns_act(rand_points[rand_point].astype(list))[term_index])
             fig = plt.figure()
             ax = fig.add_subplot(111, projection='3d')
-            colors = cm.jet(weights/max(weights))
-            color_map = cm.ScalarMappable(cmap=cm.jet)
+            colors = cm.viridis(weights/max(weights))
+            color_map = cm.ScalarMappable(cmap=cm.viridis)
             color_map.set_array(weights)
             fig.colorbar(color_map)
             x = self.no._ns['mni_coords'].data[inds_of_real_points_with_no_fucking_missing_study_ids, 0]
@@ -136,10 +165,10 @@ class NsabaVisualizer(object):
         ax.set_title('Estimation of ' + term)
 
     @not_operational
-    def lstsq_ge_ns(self, gene, term, logy=False, logx=False):
-        self.lstsq_ns_ge(self, term, gene, logy=logy, logx=logx)
+    def lstsq_ge_ns(self, gene, term, logy=False, logx=False, regression_line=True):
+        self.lstsq_ns_ge(self, term, gene, logy=logy, logx=logx, regression_line=True)
 
-    def lstsq_ns_ge(self, term, gene, logy=False, logx=False, only_term=False, verbose=False):
+    def lstsq_ns_ge(self, term, gene, logy=False, logx=False, only_term=False, verbose=False, regression_line=True):
         """
         Generates a linear regression plot for gene expression to
         term activation.
@@ -180,6 +209,7 @@ class NsabaVisualizer(object):
                             ge_ns_mat = self.no.matrix_builder([term], gene)
                     fig = plt.figure()
                     ax = fig.add_subplot(111)
+                    ax.grid(False)
                     if logy:
                         ax.set_yscale('log')
                     if logx:
@@ -203,11 +233,14 @@ class NsabaVisualizer(object):
                     #       +' Slope =' + str(m) + ' y intercept = '+ str(c)
 
                     ax.plot(ge_ns_mat[:, 0], ge_ns_mat[:, 1], '.')
-                    ax.plot([min(ge_ns_mat[:, 0]), max(ge_ns_mat[:, 0][valid_inds])], [m*min(ge_ns_mat[:, 0][valid_inds])+c,
-                                                                           m*max(ge_ns_mat[:, 0][valid_inds])+c], 'r')
+                    ax.
+                    if regression_line is True:
+                        ax.plot([min(ge_ns_mat[:, 0]), max(ge_ns_mat[:, 0][valid_inds])],
+                                [m*min(ge_ns_mat[:, 0][valid_inds])+c,
+                                m*max(ge_ns_mat[:, 0][valid_inds])+c], 'r')
                     ax.set_xlabel(str(gene))
                     ax.set_ylabel(term)
-                    if verbose == True:
+                    if verbose is True:
                         print 'correlation: r=' + str(r[1]) + '\n'
                         print 'linear regression: m=' + str(m) + ' c=' + str(c)
                     return [r, p], [m, c]
