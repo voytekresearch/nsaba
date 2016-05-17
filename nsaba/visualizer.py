@@ -37,9 +37,9 @@ class NsabaVisualizer(object):
             fig = plt.figure(figsize=figsize)
             ax = fig.add_subplot(111, projection='3d')
             if z_score is True:
-                weights = (self.no.ge[gene]["mean"]['GE']-self.no.ge[gene]["mean"]['GE'].mean())/self.no.ge[gene]["mean"]['GE'].std()
+                weights = (np.nan_to_num(self.no.ge[gene]["mean"]['GE'])-np.nanmean(self.no.ge[gene]["mean"]['GE']))/np.nanstd(self.no.ge[gene]["mean"]['GE'])
             else:
-                weights = self.no.ge[gene]["mean"]['GE']
+                weights = np.nan_to_num(self.no.ge[gene]["mean"]['GE'])
             colors = cm.viridis(weights)
             color_map = cm.ScalarMappable(cmap=cm.viridis)
             color_map.set_array(weights)
@@ -62,7 +62,7 @@ class NsabaVisualizer(object):
             fig = plt.figure(figsize=figsize)
             ax = fig.add_subplot(111, projection='3d')
             if z_score is True:
-                weights = (self.no.term[term]['act']-np.nanmean(self.no.term[term]['act']))/np.nanstd(self.no.term[term]['act'])
+                weights = (np.nan_to_num(no.term[term]['act'])-np.nanmean(self.no.term[term]['act']))/np.nanstd(self.no.term[term]['act'])
             else:
                 weights = np.nan_to_num(self.no.term[term]['act'])
             colors = cm.viridis(weights)
@@ -233,7 +233,7 @@ class NsabaVisualizer(object):
                     #       +' Slope =' + str(m) + ' y intercept = '+ str(c)
 
                     ax.plot(ge_ns_mat[:, 0], ge_ns_mat[:, 1], '.')
-                    ax.
+                    ax.grid(False)
                     if regression_line is True:
                         ax.plot([min(ge_ns_mat[:, 0]), max(ge_ns_mat[:, 0][valid_inds])],
                                 [m*min(ge_ns_mat[:, 0][valid_inds])+c,
