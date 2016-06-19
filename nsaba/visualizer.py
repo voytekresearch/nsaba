@@ -53,8 +53,7 @@ class NsabaVisualizer(object):
             ax.set_title('Gene Expression of gene ID ' + str(gene))
             return fig
         else:
-            raise ValueError("Gene %s has not been initialized. "
-                             "Use self.no.get_aba_ge([%s])" % str(e))
+            raise ValueError("Gene %s has not been initialized. Use self.no.get_aba_ge([%s])" % str(gene))
 
     def visualize_ns(self, term, alpha=0.5, figsize=(16, 10), z_score=True):
 
@@ -78,8 +77,7 @@ class NsabaVisualizer(object):
             ax.set_title('Map of ' + term)
             return fig
         else:
-            raise ValueError("Term %s has not been initialized. "
-                             "Use N.get_ns_act([%s])" % term)
+            raise ValueError("Term '%s' has not been initialized. Use get_ns_act('%s')" % term)
 
     def visualize_ns_all(self, term, no_ids=10, alpha=0.2, figsize=(16, 10), z_score=True):
         """

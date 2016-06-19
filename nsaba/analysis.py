@@ -197,7 +197,7 @@ class NsabaAnalysis(object):
         # Histogram/KDE Plots
         if graphops == 'density':
             ax = plt.axes()
-            ax.set_title('Gene Expression Distributions')
+            ax.set_title('Gene Expression Distributions of gene id: ' + gene)
             ax.set_xlabel(str(gene))
             ax.set_ylabel('density')
             sns.distplot(funct_grp, ax=ax, label=term)
@@ -208,13 +208,13 @@ class NsabaAnalysis(object):
             ax.boxplot([cont_grp, funct_grp])
             ax.set_xticks([1, 2])
             ax.set_xticklabels(["Low '"+term+"'", "High '"+term+"'"])
-            ax.set_ylabel('Gene Expression')
+            ax.set_ylabel('Gene Expression of gene id: '+gene)
         elif graphops == 'violin':
             ax = plt.axes()
             ax.violinplot([cont_grp, funct_grp])
             ax.set_xticks([1, 2])
             ax.set_xticklabels(["Low '"+term+"'", "High '"+term+"'"])
-            ax.set_ylabel('Gene Expression')
+            ax.set_ylabel('Gene Expression of gene id: '+gene)
             ax.plot(np.ones(len(cont_grp)), cont_grp, 'b.')
             ax.plot(1, np.mean(cont_grp), 'bs')
             ax.plot(2*np.ones(len(funct_grp)), funct_grp, 'g.')
