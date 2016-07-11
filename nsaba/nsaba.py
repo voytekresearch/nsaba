@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 from scipy import spatial
 from scipy import signal
+import random
 
 from sklearn.neighbors import RadiusNeighborsRegressor
 from nsabatools import not_operational, preprint
@@ -165,7 +166,7 @@ class NsabaBase(object):
                 c += 1
 
     @classmethod
-    def custom_load(cls, custom_coords, custom_vals):
+    def custom_load(cls, custom_coords=None, custom_structs = None):
         """
         Loads custom data into Nsaba
 
@@ -214,6 +215,7 @@ class Nsaba(NsabaBase):
         self.ns_weight_f = lambda r: 1. / np.power(r, 2)
         self._gaussian_weight_radius = 5
         self._FWHM = 0
+        self.structures_confined_to = []
 
     def get_ns_struct(self, key=None):
         """
@@ -288,6 +290,49 @@ class Nsaba(NsabaBase):
         for ele in estimation_distances:
             weights.append([rad_fit_to_gaussian[int(rad_i)] for rad_i in ele])
         return weights
+
+    def randomize_gene_expression(self):
+        """Shuffles gene expression data"""
+        cols = self._aba['exp_df'].shape[1]
+        all_probe_ids = self._aba['exp_df']['probe_id']
+        data = np.zeros((len(all_probe_ids), cols-1))
+        for i, probe in enumerate(all_probe_ids):
+            data[i, :] = self._aba['exp_df'].loc[self._aba['exp_df']['probe_id'] == probe].as_matrix()[0][1:]
+            random.shuffle(data[i, :])
+        probe_df = pd.DataFrame({"probe_id": all_probe_ids})
+        dat_df = pd.DataFrame(data)
+        new_df = pd.concat([probe_df, dat_df], axis=1)
+        self._aba['exp_df'] = new_df
+
+    def confine_search(self, structure_names):
+        """
+        Confines gene expression data to specified structures. A list of all structure acronyms can be found here:
+        self._aba['si_df']['structure_acronym']
+        """
+        # find locations that are in the structures of interest
+        try:
+            all_structure_inds = []
+            for structure in structure_names:
+                inds_of_structure = self._aba['si_df']['structure_acronym'].index[self._aba['si_df']['structure_acronym'] == structure]
+                all_structure_inds.extend(inds_of_structure)
+
+            # remove data in databases that isn't in the structures of interest
+            self._aba['si_df'] = self._aba['si_df'].iloc[all_structure_inds]
+
+            new_mni_coords = self._aba['si_df'].loc[all_structure_inds, 'mni_x':'mni_z'].as_matrix().astype(float)
+            self._aba['mni_coords'] = spatial.KDTree(new_mni_coords)
+            print "Gene expression limited to " + str(structure_names)
+
+            # exp_df is indexed off by 1 because it has a row for probe_ids
+            all_structure_inds_exp_df = [i+1 for i in all_structure_inds]
+            all_structure_inds_exp_df.insert(0, "probe_id")
+            self._aba['exp_df'] = self._aba['exp_df'].loc[:, all_structure_inds_exp_df]
+
+            # save it so you can look it up later
+            self.structures_confined_to = structure_names
+
+        except IndexError:
+            print "Data has already been confined to:" + str(self.structures_confined_to)
 
     def estimate_aba_ge(self, entrez_ids, coords=None, save_classifier=False, **kwargs):
         """
